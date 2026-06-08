@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { Text, TextInput, Button, Snackbar, SegmentedButtons } from 'react-native-paper';
+import { Text, TextInput, Button, Snackbar } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { register } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -13,7 +13,6 @@ export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('student');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -28,7 +27,7 @@ export default function RegisterScreen() {
       full_name: fullName.trim(),
       email: email.toLowerCase().trim(),
       password,
-      role
+      role: 'student'
     });
     setLoading(false);
 
@@ -50,16 +49,6 @@ export default function RegisterScreen() {
         </View>
 
         <View style={styles.form}>
-          <SegmentedButtons
-            value={role}
-            onValueChange={setRole}
-            buttons={[
-              { value: 'student', label: 'Студент' },
-              { value: 'teacher', label: 'Преподаватель' },
-            ]}
-            style={{ marginBottom: 8 }}
-          />
-
           <TextInput
             label="ФИО *"
             value={fullName}

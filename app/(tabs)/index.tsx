@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from '
 import { Text, Card, Icon, IconButton, Avatar } from 'react-native-paper';
 import { useAuth } from '../../contexts/AuthContext';
 import { THEME } from '../../constants/theme';
-import { getAllBooks, Book } from '../../services/bookService';
+import { getAllBooks, Book, syncGutenbergBooks } from '../../services/bookService';
 import { useRouter } from 'expo-router';
 import MaterialCard from '../../components/MaterialCard';
 
@@ -28,6 +28,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData();
+    syncGutenbergBooks().then(loadData).catch(() => {});
   }, []);
 
   const onRefresh = useCallback(async () => {

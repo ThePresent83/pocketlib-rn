@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Text, Searchbar, IconButton, Portal, Modal, Button, List, Chip, Divider } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { THEME } from '../../constants/theme';
-import { getAllBooks, Book, BookFilters } from '../../services/bookService';
+import { getAllBooks, Book, BookFilters, syncGutenbergBooks } from '../../services/bookService';
 import { getAllDisciplines, Discipline, getAllCategories, Category } from '../../services/disciplineService';
 import MaterialCard from '../../components/MaterialCard';
 
@@ -15,6 +15,8 @@ export default function LibraryScreen() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState('');
   
   // Filters
   const [filterVisible, setFilterVisible] = useState(false);
@@ -52,6 +54,23 @@ export default function LibraryScreen() {
     loadData();
     loadFilterData();
   }, [query, isOfflineOnly, selectedDiscipline, selectedCategory, materialType]);
+
+  useEffect(() => {
+    syncFromApi();
+  }, []);
+
+  const syncFromApi = async () => {
+    setSyncing(true);
+    try {
+      await syncGutenbergBooks();
+      setSyncError('');
+      await loadData();
+    } catch (error: any) {
+      setSyncError('Не удалось обновить Gutenberg. Проверьте подключение к интернету.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -102,6 +121,12 @@ export default function LibraryScreen() {
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
+        <View style={styles.syncRow}>
+          <Button mode="outlined" icon="sync" loading={syncing} disabled={syncing} onPress={syncFromApi}>
+            Обновить Gutenberg
+          </Button>
+          {!!syncError && <Text style={styles.syncError}>{syncError}</Text>}
+        </View>
         {books.length > 0 ? (
           books.map(book => (
             <MaterialCard 
@@ -207,6 +232,8 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', marginTop: 12 },
   chip: { marginRight: 8, backgroundColor: 'rgba(255,255,255,0.2)' },
   list: { padding: 16, paddingBottom: 40 },
+  syncRow: { gap: 6, marginBottom: 12 },
+  syncError: { color: THEME.colors.error, fontSize: 12 },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 },
   modal: { backgroundColor: 'white', padding: 24, margin: 20, borderRadius: 16 },
   modalTitle: { fontWeight: 'bold', marginBottom: 12 },

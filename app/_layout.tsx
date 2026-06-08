@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { View } from 'react-native';
 import { ActivityIndicator } from 'react-native-paper';
+import { LanguageProvider } from '../contexts/LanguageContext';
 
 const paperTheme = {
   ...MD3LightTheme,
@@ -79,11 +80,13 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <PaperProvider theme={paperTheme}>
-          <AuthGuard />
-        </PaperProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <PaperProvider theme={paperTheme}>
+            <AuthGuard />
+          </PaperProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }

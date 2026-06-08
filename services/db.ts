@@ -100,6 +100,8 @@ export async function initDb() {
     'version VARCHAR(32)',
     'access_level VARCHAR(32) DEFAULT "public"',
     'uploaded_by INTEGER',
+    'external_url VARCHAR(1024)',
+    'remote_id VARCHAR(128)',
     'created_at DATETIME DEFAULT CURRENT_TIMESTAMP'
   ];
 
@@ -124,4 +126,3 @@ export async function initDb() {
     console.error('Error creating default admin', e);
   }
 }
-

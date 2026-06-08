@@ -2,10 +2,12 @@ import { Tabs } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { THEME } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function TabLayout() {
   const { user } = useAuth();
   const isAdminOrTeacher = user?.role === 'admin' || user?.role === 'teacher';
+  const { t } = useLanguage();
 
   return (
     <Tabs
@@ -26,7 +28,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Главная',
+          title: t('home'),
           tabBarIcon: ({ color }) => <MaterialCommunityIcons name="view-dashboard" size={24} color={color} />,
           headerShown: false,
         }}
@@ -34,18 +36,35 @@ export default function TabLayout() {
       <Tabs.Screen
         name="library"
         options={{
-          title: 'Библиотека',
+          title: t('library'),
           tabBarIcon: ({ color }) => <MaterialCommunityIcons name="bookshelf" size={24} color={color} />,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="official"
+        options={{
+          title: t('official'),
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="certificate-outline" size={24} color={color} />,
           headerShown: false,
         }}
       />
       <Tabs.Screen
         name="add"
         options={{
-          title: 'Добавить',
+          title: t('add'),
           tabBarIcon: ({ color }) => <MaterialCommunityIcons name="plus-box" size={24} color={color} />,
           headerShown: false,
           href: isAdminOrTeacher ? '/add' : null,
+        }}
+      />
+      <Tabs.Screen
+        name="admin"
+        options={{
+          title: t('admin'),
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="shield-account" size={24} color={color} />,
+          headerShown: false,
+          href: user?.role === 'admin' ? '/admin' : null,
         }}
       />
       <Tabs.Screen

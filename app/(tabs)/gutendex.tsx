@@ -44,7 +44,7 @@ export default function GutendexScreen() {
       ia_id: item.ia_id,
       gutenberg_id: item.gutenberg_id,
       has_fulltext: item.has_fulltext,
-      source: 'gutendex',
+      source: item.source,
       is_downloaded: false,
     });
 

@@ -61,3 +61,18 @@ export async function getUserById(id: number): Promise<User | null> {
   }
   return null;
 }
+
+export async function getAllUsers(): Promise<User[]> {
+  const db = await getDb();
+  return await db.getAllAsync<User>('SELECT id, full_name, email, role, speciality_id, course_id, group_name, created_at FROM users ORDER BY id');
+}
+
+export async function updateUserRole(id: number, role: User['role']): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('UPDATE users SET role = ? WHERE id = ?', [role, id]);
+}
+
+export async function deleteUser(id: number): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM users WHERE id = ? AND email <> ?', [id, 'admin@university.edu']);
+}

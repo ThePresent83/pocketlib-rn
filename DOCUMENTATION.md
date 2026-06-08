@@ -112,3 +112,33 @@ pocketlib-rn/
 - Синхронизацию библиотеки с облаком (Firebase / Supabase).
 - Полноценный встроенный PDF-парсер без выхода в системное приложение.
 - Социальные функции: шаринг цитат, рейтинг прочитанного.
+# BK API and administrator
+
+PocketLib synchronizes up to 100 official electronic textbooks from the local BK API. Start the server before opening the application:
+
+```powershell
+cd ..\bk-api
+npm start
+```
+
+The API listens on port `3047`. In Expo Go, PocketLib derives the computer IP address from the Expo development server. You can override it explicitly:
+
+```powershell
+$env:EXPO_PUBLIC_BK_API_URL="http://192.168.8.61:3047"
+npm start
+```
+
+The initial local administrator account is:
+
+```text
+Email:    admin@university.edu
+Password: admin123
+```
+
+The administrator tab allows the administrator to synchronize the API catalog, add a local book, list users, change roles, and delete ordinary accounts.
+
+## Built-in Gutenberg bookshelf
+
+The main bookshelf is populated from Project Gutenberg and does not require the local BK API server. PocketLib ships with a starter catalog of public-domain books, including cover URLs and Gutenberg IDs. When a user opens one of these books, the application loads the legal UTF-8 text from Project Gutenberg and displays it in the built-in paged reader.
+
+The BK API remains available as a separate source of official Kazakhstan publisher links. Those links are intentionally not treated as downloadable full text and stay in the dedicated online section.

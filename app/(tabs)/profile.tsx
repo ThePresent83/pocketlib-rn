@@ -1,13 +1,15 @@
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Avatar, Button, List, Divider, Card } from 'react-native-paper';
+import { Text, Avatar, Button, List, Divider, Card, SegmentedButtons } from 'react-native-paper';
 import { useAuth } from '../../contexts/AuthContext';
 import { THEME } from '../../constants/theme';
 import { useEffect, useState } from 'react';
 import { getAllBooks } from '../../services/bookService';
 import { getAllDisciplines, getAllCategories } from '../../services/disciplineService';
+import { AppLanguage, useLanguage } from '../../contexts/LanguageContext';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const [stats, setStats] = useState({
     totalBooks: 0,
     offlineBooks: 0,
@@ -87,6 +89,18 @@ export default function ProfileScreen() {
 
       <List.Section style={styles.section}>
         <List.Subheader>Настройки</List.Subheader>
+        <View style={styles.languageBox}>
+          <Text style={styles.languageTitle}>{t('language')}</Text>
+          <SegmentedButtons
+            value={language}
+            onValueChange={(value) => setLanguage(value as AppLanguage)}
+            buttons={[
+              { value: 'ru', label: 'RU' },
+              { value: 'kk', label: 'KZ' },
+              { value: 'en', label: 'EN' },
+            ]}
+          />
+        </View>
         <List.Item title="Уведомления" left={props => <List.Icon {...props} icon="bell-outline" />} right={props => <List.Icon {...props} icon="chevron-right" />} />
         <List.Item title="Темная тема" left={props => <List.Icon {...props} icon="theme-light-dark" />} right={props => <List.Icon {...props} icon="chevron-right" />} />
       </List.Section>
@@ -161,6 +175,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginTop: 12,
   },
+  languageBox: { paddingHorizontal: 16, paddingBottom: 12 },
+  languageTitle: { color: THEME.colors.textSecondary, marginBottom: 8 },
   logoutBtn: {
     margin: 24,
     borderColor: THEME.colors.error,

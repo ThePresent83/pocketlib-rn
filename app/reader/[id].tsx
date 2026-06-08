@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, Linking } from 'react-native';
 import { Text, IconButton, Dialog, Portal, Button, List, Snackbar } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { getBookById, Book } from '../../services/bookService';
 import { getBookText } from '../../services/api';
@@ -36,10 +36,10 @@ function cleanText(raw: string): string {
   const cleaned = [];
   for (let line of lines) {
     if (line.length > 5) {
-      const alnum = (line.match(/[a-zA-Zа-яА-Я0-9]/g) || []).length;
+      const alnum = (line.match(/[a-zA-Z\u0430-\u044f\u0410-\u042f\u0451\u04010-9]/g) || []).length;
       if (alnum / line.length < 0.35) continue;
     }
-    line = line.replace(/[«»<>^&#*%£$|[\]{}~@]/g, '').replace(/ {2,}/g, ' ').trim();
+    line = line.replace(/[\u00ab\u00bb<>^&#*%\u00a3$|[\]{}~@]/g, '').replace(/ {2,}/g, ' ').trim();
     if (line) cleaned.push(line);
   }
   return cleaned.join('\n\n');
@@ -63,7 +63,9 @@ export default function ReaderScreen() {
 
   const themes = ['light', 'sepia', 'dark'] as const;
   const currentTheme = THEME.readerThemes[themes[themeIdx]];
-  const bookKey = book ? (book.file_path ? `file:${book.file_path}` : `ol:${book.ol_key}`) : '';
+  const bookKey = book
+    ? (book.file_path ? `file:${book.file_path}` : book.external_url ? `url:${book.external_url}` : `ol:${book.ol_key}`)
+    : '';
 
   useEffect(() => {
     if (id) loadBook(Number(id));
@@ -74,7 +76,13 @@ export default function ReaderScreen() {
     if (!b) return;
     setBook(b);
     
-    if (b.file_path) {
+    if (b.external_url) {
+      setPages([
+        `${b.title}\n\nДля этой книги доступна официальная электронная версия. Нажмите кнопку ниже, чтобы открыть чтение на сайте издательства.`
+      ]);
+      setCurrentPage(0);
+      setLoadingMsg('');
+    } else if (b.file_path) {
       if (b.file_path.toLowerCase().endsWith('.pdf')) {
         showPdfStub(b.file_path, b.title);
       } else {
@@ -89,6 +97,16 @@ export default function ReaderScreen() {
       setLoadingMsg('⏳ Загрузка текста книги...\nЭто может занять несколько секунд.');
       const text = await getBookText(b.ol_key);
       initReader(text || 'Текст недоступен', b);
+    }
+  };
+
+  const openOnlineReader = async () => {
+    if (!book?.external_url) return;
+    const supported = await Linking.canOpenURL(book.external_url);
+    if (supported) await Linking.openURL(book.external_url);
+    else {
+      setSnackbarMsg('Не удалось открыть официальную ссылку');
+      setSnackbarVisible(true);
     }
   };
 
@@ -207,6 +225,11 @@ export default function ReaderScreen() {
               Открыть в системном просмотрщике
             </Button>
           )}
+          {!!book?.external_url && (
+            <Button mode="contained" icon="open-in-new" onPress={openOnlineReader} style={{ margin: 20 }}>
+              Читать на сайте издательства
+            </Button>
+          )}
         </ScrollView>
       )}
 
@@ -280,7 +303,7 @@ const styles = StyleSheet.create({
   },
   text: {
     padding: 24,
-    lineHeight: 28,
+    lineHeight: 30,
   },
   bottombar: {
     flexDirection: 'row',
