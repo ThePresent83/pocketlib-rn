@@ -68,4 +68,3 @@ CREATE TABLE book_reads (
     CONSTRAINT fk_book_reads_book_id FOREIGN KEY (book_id) REFERENCES books (id) ON DELETE CASCADE,
     CONSTRAINT uq_book_reads_user_book UNIQUE (user_id, book_id)
 );
-

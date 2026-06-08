@@ -8,7 +8,7 @@ import (
 	bookhttp "backend/src/http"
 	"backend/src/repo"
 	"backend/src/servisec"
-	"backend/src/sqlc"
+	sqlc "backend/src/sqlc/generated"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -43,9 +43,14 @@ func Run(ctx context.Context) error {
 	}
 
 	queries := sqlc.New(db)
+	authRepo := repo.NewAuthRepo(queries)
+	tokenService := servisec.NewTokenService(cfg.Auth)
+	authService := servisec.NewAuthService(authRepo, tokenService, cfg.Auth)
+	groupRepo := repo.NewGroupRepo(queries)
+	groupService := servisec.NewGroupService(groupRepo)
 	bookRepo := repo.NewBookRepo(queries)
-	bookService := servisec.NewBookService(bookRepo, servisec.NewS3Storage(s3Client, cfg.S3.BucketMain))
-	handler := bookhttp.NewHandler(bookService, logger)
+	bookService := servisec.NewBookService(bookRepo, servisec.NewS3Storage(s3Client, cfg.S3.BucketMain, cfg.S3.Endpoint))
+	handler := bookhttp.NewHandler(authService, groupService, bookService, logger)
 
 	server := &http.Server{
 		Addr:    cfg.Server.Addr(),

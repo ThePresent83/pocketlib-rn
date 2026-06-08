@@ -2,16 +2,15 @@ package servisec
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"mime/multipart"
 	"path/filepath"
 	"strings"
-	"time"
 
+	"backend/src/domain"
 	"backend/src/repo"
-	"backend/src/sqlc"
+	sqlc "backend/src/sqlc/generated"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -21,28 +20,20 @@ type BookService struct {
 	storage *S3Storage
 }
 
+var ErrBookFileNotFound = errors.New("book file is not uploaded")
+
+type BookFileObject struct {
+	Object   StoredObject
+	FileName string
+}
+
 type BookInput struct {
-	LegacyID        *int64          `json:"legacy_id"`
-	Title           string          `json:"title"`
-	Subtitle        *string         `json:"subtitle"`
-	Author          *string         `json:"author"`
-	Year            *int32          `json:"year"`
-	Isbn            *string         `json:"isbn"`
-	Language        *string         `json:"language"`
-	Department      *string         `json:"department"`
-	DepartmentCode  *string         `json:"department_code"`
-	PublicationType *string         `json:"publication_type"`
-	PublisherPlace  *string         `json:"publisher_place"`
-	PublisherName   *string         `json:"publisher_name"`
-	Pages           *int32          `json:"pages"`
-	Price           *string         `json:"price"`
-	Quantity        *int32          `json:"quantity"`
-	Keywords        *string         `json:"keywords"`
-	Description     *string         `json:"description"`
-	LibraryName     *string         `json:"library_name"`
-	LocationName    *string         `json:"location_name"`
-	HtmlPath        *string         `json:"html_path"`
-	RawData         json.RawMessage `json:"raw_data"`
+	Title           string  `json:"title"`
+	Author          *string `json:"author"`
+	Year            *int32  `json:"year"`
+	Description     *string `json:"description"`
+	ContentS3Key    *string `json:"content_s3_key"`
+	ContentS3Bucket *string `json:"content_s3_bucket"`
 }
 
 type ListBooksFilter struct {
@@ -56,25 +47,31 @@ func NewBookService(repo *repo.BookRepo, storage *S3Storage) *BookService {
 }
 
 func (service *BookService) CreateBook(ctx context.Context, input BookInput) (sqlc.Book, error) {
-	params, err := createBookParams(input)
-	if err != nil {
-		return sqlc.Book{}, err
-	}
-	return service.repo.CreateBook(ctx, params)
+	return service.repo.CreateBook(ctx, createBookParams(input))
 }
 
-func (service *BookService) UpsertBook(ctx context.Context, input BookInput) (sqlc.Book, error) {
-	params, err := upsertBookParams(input)
+func (service *BookService) UpdateBook(ctx context.Context, id string, input BookInput) (sqlc.Book, error) {
+	bookID, err := parseUUID(id)
 	if err != nil {
-		return sqlc.Book{}, err
+		return sqlc.Book{}, domain.ErrInvalidID
 	}
-	return service.repo.UpsertBookByLegacyID(ctx, params)
+
+	params := createBookParams(input)
+	return service.repo.UpdateBook(ctx, sqlc.UpdateBookParams{
+		ID:              bookID,
+		Title:           params.Title,
+		Author:          params.Author,
+		Year:            params.Year,
+		Description:     params.Description,
+		ContentS3Key:    params.ContentS3Key,
+		ContentS3Bucket: params.ContentS3Bucket,
+	})
 }
 
 func (service *BookService) GetBook(ctx context.Context, id string) (sqlc.Book, error) {
 	bookID, err := parseUUID(id)
 	if err != nil {
-		return sqlc.Book{}, err
+		return sqlc.Book{}, domain.ErrInvalidID
 	}
 	return service.repo.GetBook(ctx, bookID)
 }
@@ -94,119 +91,86 @@ func (service *BookService) ListBooks(ctx context.Context, filter ListBooksFilte
 	})
 }
 
-func (service *BookService) UploadBookFile(ctx context.Context, bookID string, file multipart.File, header *multipart.FileHeader) (sqlc.BookFile, error) {
+func (service *BookService) DeleteBook(ctx context.Context, id string) error {
+	bookID, err := parseUUID(id)
+	if err != nil {
+		return domain.ErrInvalidID
+	}
+
+	return service.repo.DeleteBook(ctx, bookID)
+}
+
+func (service *BookService) UploadBookFile(ctx context.Context, bookID string, file multipart.File, header *multipart.FileHeader) (sqlc.Book, error) {
 	id, err := parseUUID(bookID)
 	if err != nil {
-		return sqlc.BookFile{}, err
+		return sqlc.Book{}, domain.ErrInvalidID
 	}
 
-	fileName := filepath.Base(header.Filename)
-	objectKey := fmt.Sprintf("books/%s/%s", bookID, fileName)
-	contentType := header.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-
-	object, err := service.storage.Put(ctx, objectKey, file, contentType)
+	uploadedFile, err := service.storage.UploadFile(ctx, header.Filename, header.Size, file)
 	if err != nil {
-		return sqlc.BookFile{}, err
+		return sqlc.Book{}, err
 	}
 
-	return service.repo.CreateBookFile(ctx, sqlc.CreateBookFileParams{
-		BookID:      id,
-		Bucket:      object.Bucket,
-		ObjectKey:   object.Key,
-		FileName:    fileName,
-		ContentType: textOrNull(contentType),
-		SizeBytes:   int8OrNull(header.Size),
-		Etag:        textOrNull(object.ETag),
+	return service.repo.UpdateBookContentFile(ctx, sqlc.UpdateBookContentFileParams{
+		ID:              id,
+		ContentS3Key:    textOrNull(uploadedFile.S3Key),
+		ContentS3Bucket: textOrNull(uploadedFile.S3Bucket),
 	})
 }
 
-func (service *BookService) DownloadBookFile(ctx context.Context, bookID string) (StoredObject, sqlc.BookFile, error) {
-	id, err := parseUUID(bookID)
+func (service *BookService) DownloadBookFile(ctx context.Context, bookID string) (BookFileObject, error) {
+	book, err := service.GetBook(ctx, bookID)
 	if err != nil {
-		return StoredObject{}, sqlc.BookFile{}, err
+		return BookFileObject{}, err
+	}
+	if !book.ContentS3Key.Valid || !book.ContentS3Bucket.Valid {
+		return BookFileObject{}, ErrBookFileNotFound
 	}
 
-	file, err := service.repo.GetLatestBookFile(ctx, id)
+	object, err := service.storage.Get(ctx, book.ContentS3Bucket.String, book.ContentS3Key.String)
 	if err != nil {
-		return StoredObject{}, sqlc.BookFile{}, err
+		return BookFileObject{}, err
 	}
 
-	object, err := service.storage.Get(ctx, file.Bucket, file.ObjectKey)
-	if err != nil {
-		return StoredObject{}, sqlc.BookFile{}, err
-	}
-
-	return object, file, nil
+	return BookFileObject{
+		Object:   object,
+		FileName: filepath.Base(book.ContentS3Key.String),
+	}, nil
 }
 
-func (service *BookService) BookFileURL(ctx context.Context, bookID string, ttl time.Duration) (string, error) {
-	id, err := parseUUID(bookID)
+func (service *BookService) BookFileURL(ctx context.Context, bookID string) (string, error) {
+	book, err := service.GetBook(ctx, bookID)
 	if err != nil {
 		return "", err
 	}
-
-	file, err := service.repo.GetLatestBookFile(ctx, id)
-	if err != nil {
-		return "", err
+	if !book.ContentS3Key.Valid || !book.ContentS3Bucket.Valid {
+		return "", ErrBookFileNotFound
 	}
 
-	return service.storage.PresignedGetURL(ctx, file.Bucket, file.ObjectKey, ttl)
+	publicURL := service.storage.CreatePublicURL(book.ContentS3Key.String, book.ContentS3Bucket.String)
+	return publicURL.String(), nil
 }
 
-func (service *BookService) CopyToWriter(ctx context.Context, object StoredObject, writer io.Writer) error {
+func (service *BookService) CopyToWriter(object StoredObject, writer io.Writer) error {
 	defer object.Body.Close()
 	_, err := io.Copy(writer, object.Body)
 	return err
 }
 
-func createBookParams(input BookInput) (sqlc.CreateBookParams, error) {
+func createBookParams(input BookInput) sqlc.CreateBookParams {
 	title := strings.TrimSpace(input.Title)
 	if title == "" {
 		title = "Без названия"
 	}
-	rawData := input.RawData
-	if len(rawData) == 0 {
-		rawData = []byte("{}")
-	}
-	price, err := numericOrNull(input.Price)
-	if err != nil {
-		return sqlc.CreateBookParams{}, err
-	}
 
 	return sqlc.CreateBookParams{
-		LegacyID:        int8PtrOrNull(input.LegacyID),
 		Title:           title,
-		Subtitle:        textPtrOrNull(input.Subtitle),
 		Author:          textPtrOrNull(input.Author),
 		Year:            int4PtrOrNull(input.Year),
-		Isbn:            textPtrOrNull(input.Isbn),
-		Language:        textPtrOrNull(input.Language),
-		Department:      textPtrOrNull(input.Department),
-		DepartmentCode:  textPtrOrNull(input.DepartmentCode),
-		PublicationType: textPtrOrNull(input.PublicationType),
-		PublisherPlace:  textPtrOrNull(input.PublisherPlace),
-		PublisherName:   textPtrOrNull(input.PublisherName),
-		Pages:           int4PtrOrNull(input.Pages),
-		Price:           price,
-		Quantity:        int4PtrOrNull(input.Quantity),
-		Keywords:        textPtrOrNull(input.Keywords),
 		Description:     textPtrOrNull(input.Description),
-		LibraryName:     textPtrOrNull(input.LibraryName),
-		LocationName:    textPtrOrNull(input.LocationName),
-		HtmlPath:        textPtrOrNull(input.HtmlPath),
-		RawData:         rawData,
-	}, nil
-}
-
-func upsertBookParams(input BookInput) (sqlc.UpsertBookByLegacyIDParams, error) {
-	params, err := createBookParams(input)
-	if err != nil {
-		return sqlc.UpsertBookByLegacyIDParams{}, err
+		ContentS3Key:    textPtrOrNull(input.ContentS3Key),
+		ContentS3Bucket: textPtrOrNull(input.ContentS3Bucket),
 	}
-	return sqlc.UpsertBookByLegacyIDParams(params), nil
 }
 
 func parseUUID(value string) (pgtype.UUID, error) {
@@ -232,27 +196,4 @@ func int4PtrOrNull(value *int32) pgtype.Int4 {
 		return pgtype.Int4{}
 	}
 	return pgtype.Int4{Int32: *value, Valid: true}
-}
-
-func int8PtrOrNull(value *int64) pgtype.Int8 {
-	if value == nil {
-		return pgtype.Int8{}
-	}
-	return pgtype.Int8{Int64: *value, Valid: true}
-}
-
-func int8OrNull(value int64) pgtype.Int8 {
-	if value <= 0 {
-		return pgtype.Int8{}
-	}
-	return pgtype.Int8{Int64: value, Valid: true}
-}
-
-func numericOrNull(value *string) (pgtype.Numeric, error) {
-	if value == nil || strings.TrimSpace(*value) == "" {
-		return pgtype.Numeric{}, nil
-	}
-	var numeric pgtype.Numeric
-	err := numeric.Scan(strings.TrimSpace(*value))
-	return numeric, err
 }

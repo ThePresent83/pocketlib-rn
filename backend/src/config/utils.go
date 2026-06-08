@@ -58,3 +58,12 @@ func parseTimeout(value string) (*time.Duration, error) {
 	td := d.ToTimeDuration()
 	return &td, nil
 }
+
+func parseTimeoutWithDefault(defaultValue time.Duration) ParseFunc[time.Duration] {
+	return func(value string) (*time.Duration, error) {
+		if value == "" {
+			return &defaultValue, nil
+		}
+		return parseTimeout(value)
+	}
+}
