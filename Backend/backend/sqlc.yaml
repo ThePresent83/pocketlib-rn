@@ -1,0 +1,14 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema: "atlas/schema.sql"
+    queries: "src/sqlc/query.sql"
+    gen:
+      go:
+        package: "generated"
+        out: "src/sqlc/generated"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+        emit_empty_slices: true

@@ -42,14 +42,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="official"
-        options={{
-          title: t('official'),
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="certificate-outline" size={24} color={color} />,
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
         name="add"
         options={{
           title: t('add'),
@@ -68,24 +60,28 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="gutendex"
+        name="settings"
         options={{
-          title: 'Мировая база',
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="earth" size={24} color={color} />,
+          title: t('settings'),
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="book-cog" size={24} color={color} />,
           headerShown: false,
+          href: isAdminOrTeacher ? '/settings' : null,
         }}
+      />
+      <Tabs.Screen
+        name="gutendex"
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Профиль',
+          title: t('profile'),
           tabBarIcon: ({ color }) => <MaterialCommunityIcons name="account-circle" size={24} color={color} />,
           headerShown: false,
         }}
       />
       {/* Hide old tabs if they still exist in file system */}
       <Tabs.Screen name="search" options={{ href: null }} />
-      <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );
 }

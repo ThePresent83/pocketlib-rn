@@ -4,9 +4,21 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
+    "dev:pocketlib": "powershell -ExecutionPolicy Bypass -File scripts/start-pocketlib.ps1",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "check": "tsc --noEmit",
+    "backend:up": "docker compose -f Backend/services-up/docker-compose.yml up --build",
+    "backend:up:detached": "docker compose -f Backend/services-up/docker-compose.yml up -d --build",
+    "backend:down": "docker compose -f Backend/services-up/docker-compose.yml down",
+    "eas:init": "npx eas-cli@latest init",
+    "build:apk:easy": "powershell -ExecutionPolicy Bypass -File scripts/build-apk-local.ps1",
+    "build:apk:offline": "powershell -ExecutionPolicy Bypass -File scripts/build-apk-local.ps1",
+    "build:apk:eas": "powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1",
+    "build:apk": "powershell -ExecutionPolicy Bypass -File scripts/build-apk-local.ps1",
+    "build:apk:local": "powershell -ExecutionPolicy Bypass -File scripts/build-apk-local.ps1",
+    "build:aab": "npx eas-cli@latest build --platform android --profile production"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -20,6 +32,8 @@
     "expo-router": "~6.0.23",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
+    "fast-xml-parser": "^5.8.0",
+    "jszip": "^3.10.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -27,7 +41,8 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-vector-icons": "^10.3.0",
-    "react-native-web": "^0.21.0"
+    "react-native-web": "^0.21.0",
+    "react-native-webview": "13.15.0"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",

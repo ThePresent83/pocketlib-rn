@@ -5,8 +5,10 @@ import { searchBooks, SearchResult } from '../../services/api';
 import { addBook } from '../../services/bookService';
 import { THEME } from '../../constants/theme';
 import SearchResultCard from '../../components/SearchResultCard';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function SearchScreen() {
+  const { t } = useLanguage();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,9 +51,9 @@ export default function SearchScreen() {
     });
 
     if (newBook) {
-      setSnackbarMsg(`✅ «${item.title.substring(0, 30)}» добавлена в библиотеку`);
+      setSnackbarMsg(`«${item.title.substring(0, 30)}» ${t('added_to_library')}`);
     } else {
-      setSnackbarMsg('Ошибка при добавлении книги');
+      setSnackbarMsg(t('add_book_error'));
     }
     setSnackbarVisible(true);
   };
@@ -59,10 +61,10 @@ export default function SearchScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text variant="headlineSmall" style={styles.headerTitle}>🔍 Поиск книг</Text>
+        <Text variant="headlineSmall" style={styles.headerTitle}>{t('book_search')}</Text>
         <View style={styles.searchRow}>
           <TextInput
-            placeholder="Название, автор или тема..."
+            placeholder={t('search_books_placeholder')}
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={doSearch}
@@ -78,7 +80,7 @@ export default function SearchScreen() {
             style={styles.searchBtn}
             buttonColor={THEME.colors.accent}
           >
-            Найти
+            {t('search_button')}
           </Button>
         </View>
       </View>
@@ -90,12 +92,12 @@ export default function SearchScreen() {
       ) : !hasSearched ? (
         <View style={styles.statusBox}>
           <Icon source="magnify" size={48} color="#999" />
-          <Text style={styles.statusText}>Введите запрос и нажмите «Найти»</Text>
+          <Text style={styles.statusText}>{t('enter_query_hint')}</Text>
         </View>
       ) : results.length === 0 ? (
         <View style={styles.statusBox}>
           <Icon source="flask-empty-outline" size={48} color="#999" />
-          <Text style={styles.statusText}>Ничего не найдено</Text>
+          <Text style={styles.statusText}>{t('nothing_found')}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.resultsLayout}>

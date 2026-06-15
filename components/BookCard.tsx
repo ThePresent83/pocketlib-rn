@@ -3,6 +3,7 @@ import { Card, Text, Icon } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { Book } from '../services/bookService';
 import { THEME } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface BookCardProps {
   book: Book;
@@ -10,6 +11,7 @@ interface BookCardProps {
 }
 
 export default function BookCard({ book, onPress }: BookCardProps) {
+  const { t } = useLanguage();
   const hasText = !!(book.has_fulltext || book.ol_key);
 
   return (
@@ -31,20 +33,20 @@ export default function BookCard({ book, onPress }: BookCardProps) {
             {book.title}
           </Text>
           <Text variant="bodySmall" style={styles.author} numberOfLines={1}>
-            {book.author || 'Автор неизвестен'}
+            {book.author || t('unknown_author')}
           </Text>
           
           <View style={styles.statusRow}>
             {hasText && (
               <View style={styles.statusBadge}>
                 <Icon source="book-open-page-variant" size={14} color="#1A9E3D" />
-                <Text style={[styles.statusText, { color: '#1A9E3D' }]}>Онлайн</Text>
+                <Text style={[styles.statusText, { color: '#1A9E3D' }]}>{t('online')}</Text>
               </View>
             )}
             {!!book.is_downloaded && (
               <View style={styles.statusBadge}>
                 <Icon source="download-circle" size={14} color="#3442A4" />
-                <Text style={[styles.statusText, { color: '#3442A4' }]}>Офлайн</Text>
+                <Text style={[styles.statusText, { color: '#3442A4' }]}>{t('offline')}</Text>
               </View>
             )}
           </View>

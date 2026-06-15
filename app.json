@@ -17,6 +17,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "kz.polytech.pocketlib",
+      "versionCode": 1,
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -31,6 +33,12 @@
     "plugins": [
       "expo-router",
       "expo-sqlite"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "318da4b5-59a1-44c6-858b-39d28071b73e"
+      }
+    }
   }
 }

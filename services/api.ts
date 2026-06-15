@@ -1,5 +1,6 @@
 const BASE_URL = 'https://gutendex.com/books';
-const REQUEST_TIMEOUT_MS = 7000;
+const REQUEST_TIMEOUT_MS = 12000;
+const TEXT_REQUEST_TIMEOUT_MS = 30000;
 
 export interface SearchResult {
   ol_key: string;
@@ -52,14 +53,19 @@ function directTextUrl(id: string | number): string {
   return `https://www.gutenberg.org/ebooks/${id}.txt.utf-8`;
 }
 
-async function fetchWithTimeout(url: string): Promise<Response> {
+async function fetchWithTimeout(url: string, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { signal: controller.signal });
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function describeNetworkError(error: unknown): string {
+  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  return String(error);
 }
 
 function starterBookToResult(book: StarterBook): SearchResult {
@@ -140,11 +146,13 @@ export async function getBookDescription(): Promise<string> {
 }
 
 export async function getBookText(gutenbergId: string): Promise<string> {
+  let directError: unknown = null;
+
   try {
-    const directResponse = await fetchWithTimeout(directTextUrl(gutenbergId));
+    const directResponse = await fetchWithTimeout(directTextUrl(gutenbergId), TEXT_REQUEST_TIMEOUT_MS);
     if (directResponse.ok) return await directResponse.text();
   } catch (error) {
-    console.warn(`Direct Gutenberg text request failed for ${gutenbergId}:`, error);
+    directError = error;
   }
 
   try {
@@ -155,11 +163,13 @@ export async function getBookText(gutenbergId: string): Promise<string> {
     const textKey = Object.keys(formats).find((key) => key.startsWith('text/plain'));
     if (!textKey) throw new Error('Plain text format is unavailable');
     const textUrl = String(formats[textKey]).replace(/^http:\/\//, 'https://');
-    const textResponse = await fetchWithTimeout(textUrl);
+    const textResponse = await fetchWithTimeout(textUrl, TEXT_REQUEST_TIMEOUT_MS);
     if (!textResponse.ok) throw new Error(`Gutenberg returned ${textResponse.status}`);
     return await textResponse.text();
   } catch (error) {
-    console.error('Error fetching Gutenberg text:', error);
-    return `Не удалось загрузить текст книги. Проверьте подключение к интернету и повторите попытку.\n\n${String(error)}`;
+    console.warn(
+      `Gutenberg text is unavailable for ${gutenbergId}. Direct: ${describeNetworkError(directError)}. Fallback: ${describeNetworkError(error)}`
+    );
+    return `Не удалось загрузить текст книги. Проверьте подключение к интернету и повторите попытку.\n\n${describeNetworkError(error)}`;
   }
 }

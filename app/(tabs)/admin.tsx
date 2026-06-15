@@ -4,7 +4,6 @@ import { Button, Card, Chip, IconButton, SegmentedButtons, Snackbar, Text } from
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { syncGutenbergBooks, syncOfficialBooks } from '../../services/bookService';
 import { deleteUser, getAllUsers, updateUserRole, User } from '../../services/userService';
 import { THEME } from '../../constants/theme';
 
@@ -31,7 +30,7 @@ export default function AdminScreen() {
   if (user?.role !== 'admin') {
     return (
       <View style={styles.center}>
-        <Text>Доступ разрешен только администратору.</Text>
+        <Text>{t('admin_access_denied')}</Text>
       </View>
     );
   }
@@ -39,14 +38,14 @@ export default function AdminScreen() {
   const changeRole = async (target: User, role: User['role']) => {
     await updateUserRole(target.id, role);
     await load();
-    setMessage(`Роль пользователя ${target.full_name} обновлена`);
+    setMessage(`${t('role_updated')}: ${target.full_name}`);
   };
 
   const confirmDelete = (target: User) => {
-    Alert.alert('Удалить пользователя?', target.full_name, [
-      { text: 'Отмена', style: 'cancel' },
+    Alert.alert(t('delete_user_title'), target.full_name, [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Удалить',
+        text: t('delete'),
         style: 'destructive',
         onPress: async () => {
           await deleteUser(target.id);
@@ -56,29 +55,11 @@ export default function AdminScreen() {
     ]);
   };
 
-  const syncGutenberg = async () => {
-    try {
-      const count = await syncGutenbergBooks();
-      setMessage(`Добавлено во встроенную библиотеку: ${count} книг Gutenberg`);
-    } catch {
-      setMessage('Не удалось обновить Gutenberg. Проверьте интернет.');
-    }
-  };
-
-  const syncOfficial = async () => {
-    try {
-      const count = await syncOfficialBooks();
-      setMessage(`Добавлено официальных ссылок: ${count}`);
-    } catch {
-      setMessage('BK API недоступен. Запустите сервер на порту 3047.');
-    }
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text variant="headlineSmall" style={styles.headerTitle}>Панель администратора</Text>
-        <Text style={styles.headerSub}>Пользователи и каталог PocketLib</Text>
+        <Text variant="headlineSmall" style={styles.headerTitle}>{t('admin_panel')}</Text>
+        <Text style={styles.headerSub}>{t('admin_subtitle')}</Text>
       </View>
 
       <ScrollView
@@ -87,11 +68,9 @@ export default function AdminScreen() {
       >
         <Card style={styles.actionsCard}>
           <Card.Content>
-            <Text variant="titleMedium">Книги</Text>
+            <Text variant="titleMedium">{t('books')}</Text>
             <View style={styles.actionRow}>
-              <Button mode="contained" icon="book-plus" onPress={() => router.push('/add')}>Добавить книгу</Button>
-              <Button mode="outlined" icon="book-open-page-variant" onPress={syncGutenberg}>Загрузить Gutenberg</Button>
-              <Button mode="text" icon="link-variant" onPress={syncOfficial}>Ссылки gov.kz</Button>
+              <Button mode="contained" icon="book-plus" onPress={() => router.push('/add')}>{t('add_book')}</Button>
             </View>
           </Card.Content>
         </Card>
@@ -104,18 +83,19 @@ export default function AdminScreen() {
                 <View style={styles.userInfo}>
                   <Text variant="titleMedium">{item.full_name}</Text>
                   <Text style={styles.meta}>{item.email}</Text>
+                  {!!item.group_name && <Text style={styles.meta}>{t('group_label')}: {item.group_name}</Text>}
                 </View>
                 {item.email === 'admin@university.edu'
-                  ? <Chip compact>Основной админ</Chip>
+                  ? <Chip compact>{t('primary_admin')}</Chip>
                   : <IconButton icon="delete-outline" iconColor={THEME.colors.error} onPress={() => confirmDelete(item)} />}
               </View>
               <SegmentedButtons
                 value={item.role}
                 onValueChange={(role) => changeRole(item, role as User['role'])}
                 buttons={[
-                  { value: 'student', label: 'Студент' },
-                  { value: 'teacher', label: 'Преподаватель' },
-                  { value: 'admin', label: 'Админ' },
+                  { value: 'student', label: t('student') },
+                  { value: 'teacher', label: t('teacher') },
+                  { value: 'admin', label: t('admin') },
                 ]}
               />
             </Card.Content>

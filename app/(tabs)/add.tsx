@@ -2,32 +2,49 @@ import { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Text, TextInput, Button, Portal, Dialog, List, Icon, IconButton, SegmentedButtons } from 'react-native-paper';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { THEME } from '../../constants/theme';
-import { addBook } from '../../services/bookService';
-import { getAllDisciplines, Discipline, getAllCategories, Category } from '../../services/disciplineService';
+import { addBook, deleteBook, uploadBookFile, Book } from '../../services/bookService';
+import { getAllDisciplines, Discipline, getAllCategories, Category, Course, getCoursesForDiscipline } from '../../services/disciplineService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { getLocalizedCourseName, getLocalizedDisciplineName } from '../../utils/localizedCatalog';
+
+function getFileExtension(fileName: string): string {
+  return fileName.split('?')[0].split('.').pop()?.toLowerCase() || '';
+}
+
+function isSupportedDocument(fileName: string): boolean {
+  return ['pdf', 'txt', 'epub'].includes(getFileExtension(fileName));
+}
+
+function canReadInside(fileName: string): boolean {
+  return ['txt', 'epub'].includes(getFileExtension(fileName));
+}
 
 export default function AddMaterialScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { language: appLanguage, t } = useLanguage();
   
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [description, setDescription] = useState('');
   const [materialType, setMaterialType] = useState('textbook');
-  const [language, setLanguage] = useState('ru');
+  const [materialLanguage, setMaterialLanguage] = useState('ru');
   const [semester, setSemester] = useState('1');
   
-  const [selectedFile, setSelectedFile] = useState<{ uri: string, name: string, size?: number } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<{ uri: string, name: string, size?: number, mimeType?: string, webFile?: any } | null>(null);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   
   const [selectedDiscipline, setSelectedDiscipline] = useState<Discipline | null>(null);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   
   const [discDialogVisible, setDiscDialogVisible] = useState(false);
+  const [courseDialogVisible, setCourseDialogVisible] = useState(false);
   const [catDialogVisible, setCatDialogVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -42,19 +59,42 @@ export default function AddMaterialScreen() {
     setCategories(c);
   };
 
+  useEffect(() => {
+    if (!selectedDiscipline) {
+      setCourses([]);
+      setSelectedCourse(null);
+      return;
+    }
+
+    getCoursesForDiscipline(selectedDiscipline.id)
+      .then((nextCourses) => {
+        setCourses(nextCourses);
+        setSelectedCourse((current) =>
+          current && nextCourses.some(course => course.id === current.id) ? current : null
+        );
+      })
+      .catch(() => setCourses([]));
+  }, [selectedDiscipline]);
+
   const pickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'text/plain', 'application/epub+zip'],
+        type: ['application/pdf', 'text/plain', 'application/epub+zip', 'application/epub'],
         copyToCacheDirectory: true
       });
 
       if (!result.canceled) {
         const file = result.assets[0];
+        if (!isSupportedDocument(file.name)) {
+          Alert.alert(t('unsupported_format'), t('choose_supported_file'));
+          return;
+        }
         setSelectedFile({
           uri: file.uri,
           name: file.name,
-          size: file.size
+          size: file.size,
+          mimeType: file.mimeType,
+          webFile: (file as any).file
         });
       }
     } catch (err) {
@@ -64,50 +104,49 @@ export default function AddMaterialScreen() {
 
   const handleSave = async () => {
     if (!title || !selectedFile) {
-      Alert.alert('Ошибка', 'Введите название и выберите файл');
+      Alert.alert(t('error'), t('fill_title_file'));
       return;
     }
 
     setLoading(true);
+    let createdBook: Book | null = null;
     try {
-      // 1. Создаем папку если её нет
-      const dir = `${FileSystem.documentDirectory}materials/`;
-      const dirInfo = await FileSystem.getInfoAsync(dir);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-      }
-
-      // 2. Копируем файл
-      const fileName = `${Date.now()}_${selectedFile.name}`;
-      const destination = `${dir}${fileName}`;
-      await FileSystem.copyAsync({
-        from: selectedFile.uri,
-        to: destination
-      });
-
-      // 3. Сохраняем в БД
-      await addBook({
+      createdBook = await addBook({
         title,
         author: author || user?.full_name,
         description,
         material_type: materialType,
-        language,
+        language: materialLanguage,
         semester: parseInt(semester),
-        file_path: destination,
-        is_downloaded: true,
-        source: 'local',
+        file_name: selectedFile.name,
+        file_size: selectedFile.size,
+        content_type: selectedFile.mimeType,
+        is_downloaded: false,
+        source: 'api',
         discipline_id: selectedDiscipline?.id,
+        course_id: selectedCourse?.id,
         category_id: selectedCategory?.id,
         uploaded_by: user?.id,
-        has_fulltext: true
+        has_fulltext: canReadInside(selectedFile.name)
       });
 
-      Alert.alert('Успех', 'Материал успешно добавлен в библиотеку', [
-        { text: 'OK', onPress: () => router.replace('/(tabs)/library') }
+      if (!createdBook) throw new Error('Book was not created');
+      const uploadedBook = await uploadBookFile(createdBook.id, selectedFile);
+      if (!uploadedBook?.has_file) throw new Error('Book file was not uploaded');
+
+      Alert.alert(t('success'), t('saved_material'), [
+        { text: 'OK', onPress: () => router.replace(`/book/${uploadedBook.id}`) }
       ]);
     } catch (e) {
       console.error(e);
-      Alert.alert('Ошибка', 'Не удалось сохранить материал');
+      if (createdBook?.id) {
+        try {
+          await deleteBook(createdBook.id);
+        } catch (cleanupError) {
+          console.warn('Could not remove book after failed upload:', cleanupError);
+        }
+      }
+      Alert.alert(t('error'), t('save_failed'));
     } finally {
       setLoading(false);
     }
@@ -116,17 +155,17 @@ export default function AddMaterialScreen() {
   if (user?.role === 'student') {
     return (
       <View style={styles.center}>
-        <Text>У вас нет прав для добавления материалов.</Text>
+        <Text>{t('no_add_rights')}</Text>
       </View>
     );
   }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text variant="headlineSmall" style={styles.header}>Добавить учебный материал</Text>
+      <Text variant="headlineSmall" style={styles.header}>{t('add_material')}</Text>
       
       <TextInput
-        label="Название *"
+        label={t('title_required')}
         value={title}
         onChangeText={setTitle}
         mode="outlined"
@@ -134,7 +173,7 @@ export default function AddMaterialScreen() {
       />
       
       <TextInput
-        label="Автор / Преподаватель"
+        label={t('author_teacher')}
         value={author}
         onChangeText={setAuthor}
         mode="outlined"
@@ -143,7 +182,7 @@ export default function AddMaterialScreen() {
       />
 
       <TextInput
-        label="Описание"
+        label={t('description')}
         value={description}
         onChangeText={setDescription}
         mode="outlined"
@@ -152,26 +191,26 @@ export default function AddMaterialScreen() {
         style={styles.input}
       />
 
-      <Text style={styles.label}>Тип материала</Text>
+      <Text style={styles.label}>{t('material_type')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.segmentScroll}>
         <SegmentedButtons
           value={materialType}
           onValueChange={setMaterialType}
           buttons={[
-            { value: 'textbook', label: 'Учебник' },
-            { value: 'lecture', label: 'Лекция' },
-            { value: 'manual', label: 'Методичка' },
-            { value: 'practice', label: 'Практика' },
+            { value: 'textbook', label: t('textbook') },
+            { value: 'lecture', label: t('lecture') },
+            { value: 'manual', label: t('manual') },
+            { value: 'practice', label: t('practice') },
           ]}
         />
       </ScrollView>
 
       <View style={styles.row}>
         <View style={{ flex: 1, marginRight: 8 }}>
-          <Text style={styles.label}>Язык</Text>
+          <Text style={styles.label}>{t('language_short')}</Text>
           <SegmentedButtons
-            value={language}
-            onValueChange={setLanguage}
+            value={materialLanguage}
+            onValueChange={setMaterialLanguage}
             buttons={[
               { value: 'ru', label: 'RU' },
               { value: 'kk', label: 'KZ' },
@@ -180,7 +219,7 @@ export default function AddMaterialScreen() {
           />
         </View>
         <View style={{ width: 100 }}>
-          <Text style={styles.label}>Семестр</Text>
+          <Text style={styles.label}>{t('semester')}</Text>
           <TextInput
             value={semester}
             onChangeText={setSemester}
@@ -192,16 +231,26 @@ export default function AddMaterialScreen() {
       </View>
 
       <List.Item
-        title="Дисциплина"
-        description={selectedDiscipline ? selectedDiscipline.name : 'Выберите дисциплину'}
+        title={t('discipline')}
+        description={selectedDiscipline ? getLocalizedDisciplineName(selectedDiscipline, appLanguage) : t('choose_discipline')}
         left={props => <List.Icon {...props} icon="book-education" />}
         onPress={() => setDiscDialogVisible(true)}
         style={styles.selector}
       />
 
       <List.Item
-        title="Категория"
-        description={selectedCategory ? selectedCategory.name : 'Выберите категорию'}
+        title={t('course')}
+        description={selectedCourse
+          ? `${selectedCourse.year} ${t('course')} · ${getLocalizedCourseName(selectedCourse, appLanguage)}`
+          : selectedDiscipline ? t('choose_course') : t('choose_discipline_first')}
+        left={props => <List.Icon {...props} icon="school-outline" />}
+        onPress={() => selectedDiscipline && setCourseDialogVisible(true)}
+        style={styles.selector}
+      />
+
+      <List.Item
+        title={t('category')}
+        description={selectedCategory ? selectedCategory.name : t('choose_category')}
         left={props => <List.Icon {...props} icon="tag-outline" />}
         onPress={() => setCatDialogVisible(true)}
         style={styles.selector}
@@ -216,7 +265,7 @@ export default function AddMaterialScreen() {
           </View>
         ) : (
           <Button mode="outlined" icon="file-upload" onPress={pickDocument}>
-            Выбрать файл (PDF, TXT)
+            {t('choose_file')}
           </Button>
         )}
       </View>
@@ -228,32 +277,52 @@ export default function AddMaterialScreen() {
         disabled={loading}
         style={styles.saveBtn}
       >
-        Сохранить в библиотеку
+        {t('save')}
       </Button>
 
       {/* Dialogs */}
       <Portal>
         <Dialog visible={discDialogVisible} onDismiss={() => setDiscDialogVisible(false)}>
-          <Dialog.Title>Выберите дисциплину</Dialog.Title>
+          <Dialog.Title>{t('choose_discipline')}</Dialog.Title>
           <Dialog.ScrollArea style={{ maxHeight: 300 }}>
             <ScrollView>
               {disciplines.map(d => (
                 <List.Item
                   key={d.id}
-                  title={d.name}
+                  title={getLocalizedDisciplineName(d, appLanguage)}
                   onPress={() => {
                     setSelectedDiscipline(d);
+                    setSelectedCourse(null);
                     setDiscDialogVisible(false);
                   }}
                 />
               ))}
-              {disciplines.length === 0 && <Text style={{ padding: 20 }}>Справочник пуст</Text>}
+              {disciplines.length === 0 && <Text style={{ padding: 20 }}>{t('empty_catalog')}</Text>}
+            </ScrollView>
+          </Dialog.ScrollArea>
+        </Dialog>
+
+        <Dialog visible={courseDialogVisible} onDismiss={() => setCourseDialogVisible(false)}>
+          <Dialog.Title>{t('choose_course')}</Dialog.Title>
+          <Dialog.ScrollArea style={{ maxHeight: 300 }}>
+            <ScrollView>
+              {courses.map(course => (
+                <List.Item
+                  key={course.id}
+                  title={`${course.year} ${t('course')} · ${getLocalizedCourseName(course, appLanguage)}`}
+                  onPress={() => {
+                    setSelectedCourse(course);
+                    setCourseDialogVisible(false);
+                  }}
+                />
+              ))}
+              {courses.length === 0 && <Text style={{ padding: 20 }}>{t('no_courses_for_discipline')}</Text>}
             </ScrollView>
           </Dialog.ScrollArea>
         </Dialog>
 
         <Dialog visible={catDialogVisible} onDismiss={() => setCatDialogVisible(false)}>
-          <Dialog.Title>Выберите категорию</Dialog.Title>
+          <Dialog.Title>{t('choose_category')}</Dialog.Title>
           <Dialog.ScrollArea style={{ maxHeight: 300 }}>
             <ScrollView>
               {categories.map(c => (
@@ -266,7 +335,7 @@ export default function AddMaterialScreen() {
                   }}
                 />
               ))}
-              {categories.length === 0 && <Text style={{ padding: 20 }}>Справочник пуст</Text>}
+              {categories.length === 0 && <Text style={{ padding: 20 }}>{t('empty_catalog')}</Text>}
             </ScrollView>
           </Dialog.ScrollArea>
         </Dialog>

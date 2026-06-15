@@ -3,6 +3,7 @@ import { Card, Text, Icon, IconButton } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { SearchResult } from '../services/api';
 import { THEME } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface SearchResultCardProps {
   item: SearchResult;
@@ -10,6 +11,8 @@ interface SearchResultCardProps {
 }
 
 export default function SearchResultCard({ item, onAdd }: SearchResultCardProps) {
+  const { t } = useLanguage();
+
   return (
     <Card style={styles.card}>
       <View style={styles.row}>
@@ -32,13 +35,13 @@ export default function SearchResultCard({ item, onAdd }: SearchResultCardProps)
             {item.author}
           </Text>
           <Text variant="bodySmall" style={styles.meta} numberOfLines={1}>
-            Год: {item.year || '—'}  |  ISBN: {item.isbn || '—'}
+            {t('year')}: {item.year || '—'}  |  ISBN: {item.isbn || '—'}
           </Text>
 
           {!!item.has_fulltext && (
             <View style={styles.badgeRow}>
               <Icon source="book-open-page-variant" size={14} color="#1A9E3D" />
-              <Text style={styles.badgeText}>Читать онлайн</Text>
+              <Text style={styles.badgeText}>{t('read_online')}</Text>
             </View>
           )}
         </View>

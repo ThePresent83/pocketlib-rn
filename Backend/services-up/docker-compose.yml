@@ -1,0 +1,76 @@
+name: pocketlib
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: pocketlib
+      POSTGRES_USER: pocketlib
+      POSTGRES_PASSWORD: pocketlib
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pocketlib -d pocketlib"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until mc alias set local http://minio:9000 minio miniosecret; do
+          sleep 2
+        done
+        mc mb --ignore-existing local/files
+        mc anonymous set download local/files
+    restart: "no"
+
+  api:
+    build:
+      context: ..
+      dockerfile: services-up/backend.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: "8080"
+      POSTGRES_URL: postgres://pocketlib:pocketlib@postgres:5432/pocketlib?sslmode=disable
+      AUTH_JWT_SECRET: dev-change-me-secret
+      AUTH_ACCESS_TOKEN_TTL: PT15M
+      AUTH_REFRESH_TOKEN_TTL: P30D
+      DEFAULT_ADMIN_LOGIN: admin@university.edu
+      DEFAULT_ADMIN_PASSWORD: admin123
+      S3_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: minio
+      S3_SECRET_KEY: miniosecret
+      S3_BUCKET_MAIN: files
+      S3_USE_TLS: "false"
+      S3_PHYSICAL_ADDR: minio:9000
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  minio-data:

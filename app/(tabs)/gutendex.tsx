@@ -5,8 +5,10 @@ import { searchBooks, SearchResult } from '../../services/api';
 import { addBook } from '../../services/bookService';
 import { THEME } from '../../constants/theme';
 import SearchResultCard from '../../components/SearchResultCard';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function GutendexScreen() {
+  const { t } = useLanguage();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,9 +51,9 @@ export default function GutendexScreen() {
     });
 
     if (newBook) {
-      setSnackbarMsg(`✅ «${item.title.substring(0, 30)}» добавлена в библиотеку`);
+      setSnackbarMsg(`«${item.title.substring(0, 30)}» ${t('added_to_library')}`);
     } else {
-      setSnackbarMsg('Ошибка при добавлении книги');
+      setSnackbarMsg(t('add_book_error'));
     }
     setSnackbarVisible(true);
   };
@@ -59,11 +61,11 @@ export default function GutendexScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text variant="headlineSmall" style={styles.headerTitle}>📖 Открытая литература</Text>
-        <Text style={styles.headerSubtitle}>Поиск по базе Project Gutenberg (классика)</Text>
+        <Text variant="headlineSmall" style={styles.headerTitle}>{t('open_literature')}</Text>
+        <Text style={styles.headerSubtitle}>{t('gutenberg_search_subtitle')}</Text>
         <View style={styles.searchRow}>
           <TextInput
-            placeholder="Название или автор (на англ.)..."
+            placeholder={t('gutenberg_placeholder')}
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={doSearch}
@@ -79,7 +81,7 @@ export default function GutendexScreen() {
             style={styles.searchBtn}
             buttonColor={THEME.colors.accent}
           >
-            Найти
+            {t('search_button')}
           </Button>
         </View>
       </View>
@@ -91,12 +93,12 @@ export default function GutendexScreen() {
       ) : !hasSearched ? (
         <View style={styles.statusBox}>
           <Icon source="book-search" size={48} color="#999" />
-          <Text style={styles.statusText}>Найдите мировую классику для своей коллекции</Text>
+          <Text style={styles.statusText}>{t('find_classics_hint')}</Text>
         </View>
       ) : results.length === 0 ? (
         <View style={styles.statusBox}>
           <Icon source="flask-empty-outline" size={48} color="#999" />
-          <Text style={styles.statusText}>Ничего не найдено</Text>
+          <Text style={styles.statusText}>{t('nothing_found')}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.resultsLayout}>

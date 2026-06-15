@@ -1,26 +1,35 @@
-import { getDb } from './db';
-import { getPopularBooks } from './api';
-import { getOfficialBooks, runOfficialFilter } from './bkApiService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
+import { Platform } from 'react-native';
+import { apiRequest, apiUrl, authHeaders } from './backendApi';
+import { EntityId } from './disciplineService';
+
+const DOWNLOADS_KEY = 'pocketlib_downloaded_books';
+const webDownloadMap: DownloadMap = {};
 
 export interface Book {
-  id: number;
+  id: EntityId;
   title: string;
-  author: string;
+  author?: string;
   year?: number;
   isbn?: string;
   description?: string;
   cover_url?: string;
   file_path?: string;
+  file_name?: string;
+  file_size?: number;
+  content_type?: string;
+  has_file?: boolean;
   is_downloaded: boolean;
   source: string;
   ol_key?: string;
   ia_id?: string;
   gutenberg_id?: string;
   has_fulltext: boolean;
-  discipline_id?: number;
-  course_id?: number;
-  category_id?: number;
-  speciality_id?: number;
+  discipline_id?: EntityId;
+  course_id?: EntityId;
+  category_id?: EntityId;
+  speciality_id?: EntityId;
   material_type?: string;
   language?: string;
   semester?: number;
@@ -28,17 +37,17 @@ export interface Book {
   tags?: string;
   version?: string;
   access_level?: string;
-  uploaded_by?: number;
+  uploaded_by?: EntityId;
   created_at?: string;
   external_url?: string;
   remote_id?: string;
 }
 
 export interface BookFilters {
-  disciplineId?: number;
-  courseId?: number;
-  categoryId?: number;
-  specialityId?: number;
+  disciplineId?: EntityId;
+  courseId?: EntityId;
+  categoryId?: EntityId;
+  specialityId?: EntityId;
   materialType?: string;
   language?: string;
   semester?: number;
@@ -46,217 +55,401 @@ export interface BookFilters {
   isDownloaded?: boolean;
 }
 
-export async function getAllBooks(filters: BookFilters = {}): Promise<Book[]> {
-  const db = await getDb();
-  let query = 'SELECT * FROM books WHERE 1=1';
-  const params: any[] = [];
-
-  if (filters.disciplineId) {
-    query += ' AND discipline_id = ?';
-    params.push(filters.disciplineId);
-  }
-  if (filters.courseId) {
-    query += ' AND course_id = ?';
-    params.push(filters.courseId);
-  }
-  if (filters.categoryId) {
-    query += ' AND category_id = ?';
-    params.push(filters.categoryId);
-  }
-  if (filters.specialityId) {
-    query += ' AND speciality_id = ?';
-    params.push(filters.specialityId);
-  }
-  if (filters.materialType) {
-    query += ' AND material_type = ?';
-    params.push(filters.materialType);
-  }
-  if (filters.language) {
-    query += ' AND language = ?';
-    params.push(filters.language);
-  }
-  if (filters.semester) {
-    query += ' AND semester = ?';
-    params.push(filters.semester);
-  }
-  if (filters.isDownloaded !== undefined) {
-    query += ' AND is_downloaded = ?';
-    params.push(filters.isDownloaded ? 1 : 0);
-  }
-  if (filters.searchQuery) {
-    query += ' AND (title LIKE ? OR author LIKE ? OR tags LIKE ? OR teacher LIKE ?)';
-    const like = `%${filters.searchQuery}%`;
-    params.push(like, like, like, like);
-  }
-  
-  query += ' ORDER BY id DESC';
-  
-  const result = await db.getAllAsync(query, params);
-  return result as Book[];
+interface DownloadEntry {
+  file_path: string;
+  file_name?: string;
+  downloaded_at: string;
 }
 
-export async function getBookById(id: number): Promise<Book | null> {
-  const db = await getDb();
-  const result = await db.getFirstAsync('SELECT * FROM books WHERE id = ?', [id]);
-  return result as Book | null;
+type DownloadMap = Record<string, DownloadEntry>;
+
+type UploadableBookFile = {
+  uri: string;
+  name: string;
+  mimeType?: string;
+  webFile?: any;
+};
+
+function normalizeBook(input: any): Book {
+  return {
+    ...input,
+    author: input.author || '',
+    description: input.description || '',
+    cover_url: input.cover_url || '',
+    source: input.source || 'api',
+    has_fulltext: Boolean(input.has_fulltext),
+    has_file: Boolean(input.has_file || input.content_s3_key),
+    is_downloaded: false,
+  };
+}
+
+async function getDownloadMap(): Promise<DownloadMap> {
+  try {
+    const raw = await AsyncStorage.getItem(DOWNLOADS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function setDownloadMap(map: DownloadMap) {
+  await AsyncStorage.setItem(DOWNLOADS_KEY, JSON.stringify(map));
+}
+
+async function ensureMaterialDirectory(bookId: EntityId): Promise<string> {
+  const dir = `${FileSystem.documentDirectory}materials/${bookId}/`;
+  const dirInfo = await FileSystem.getInfoAsync(dir);
+  if (!dirInfo.exists) {
+    await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+  }
+  return dir;
+}
+
+async function rememberDownloadedBook(book: Book, filePath: string, fileName: string): Promise<Book> {
+  if (Platform.OS === 'web') {
+    webDownloadMap[book.id] = {
+      file_path: filePath,
+      file_name: fileName,
+      downloaded_at: new Date().toISOString(),
+    };
+    return {
+      ...book,
+      file_path: filePath,
+      file_name: fileName,
+      is_downloaded: true,
+    };
+  }
+
+  const downloads = await getDownloadMap();
+  downloads[book.id] = {
+    file_path: filePath,
+    file_name: fileName,
+    downloaded_at: new Date().toISOString(),
+  };
+  await setDownloadMap(downloads);
+
+  return {
+    ...book,
+    file_path: filePath,
+    file_name: fileName,
+    is_downloaded: true,
+  };
+}
+
+async function withDownloadState(book: Book): Promise<Book> {
+  if (Platform.OS === 'web') {
+    const webEntry = webDownloadMap[book.id];
+    return webEntry?.file_path
+      ? {
+          ...book,
+          file_path: webEntry.file_path,
+          file_name: webEntry.file_name || book.file_name,
+          is_downloaded: true,
+        }
+      : book;
+  }
+
+  const downloads = await getDownloadMap();
+  const entry = downloads[book.id];
+  if (!entry?.file_path) return book;
+
+  let info: { exists: boolean };
+  try {
+    info = await FileSystem.getInfoAsync(entry.file_path);
+  } catch {
+    delete downloads[book.id];
+    await setDownloadMap(downloads);
+    return book;
+  }
+
+  if (!info.exists) {
+    delete downloads[book.id];
+    await setDownloadMap(downloads);
+    return book;
+  }
+
+  return {
+    ...book,
+    file_path: entry.file_path,
+    file_name: entry.file_name || book.file_name,
+    is_downloaded: true,
+  };
+}
+
+async function withDownloads(books: Book[], downloadedOnly?: boolean): Promise<Book[]> {
+  const hydrated = await Promise.all(books.map(withDownloadState));
+  return downloadedOnly ? hydrated.filter((book) => book.is_downloaded) : hydrated;
+}
+
+function buildQuery(filters: BookFilters) {
+  const params: string[] = [];
+  const add = (key: string, value?: string | number) => {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      params.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+    }
+  };
+  add('q', filters.searchQuery);
+  add('discipline_id', filters.disciplineId);
+  add('course_id', filters.courseId);
+  add('category_id', filters.categoryId);
+  add('material_type', filters.materialType);
+  add('language', filters.language);
+  add('semester', filters.semester);
+  add('limit', 100);
+  return params.length ? `?${params.join('&')}` : '';
+}
+
+export async function getAllBooks(filters: BookFilters = {}): Promise<Book[]> {
+  const result = await apiRequest<any[]>(`/books${buildQuery(filters)}`, {}, false);
+  return withDownloads(result.map(normalizeBook), filters.isDownloaded);
+}
+
+export async function getBookById(id: EntityId): Promise<Book | null> {
+  try {
+    const result = await apiRequest<any>(`/books/${encodeURIComponent(id)}`, {}, false);
+    return withDownloadState(normalizeBook(result));
+  } catch {
+    return null;
+  }
 }
 
 export async function addBook(data: Partial<Book>): Promise<Book | null> {
-  const db = await getDb();
   try {
-    const result = await db.runAsync(`
-      INSERT INTO books (
-        title, author, year, isbn, description, cover_url, file_path, 
-        is_downloaded, source, ol_key, ia_id, gutenberg_id, has_fulltext,
-        discipline_id, course_id, category_id, speciality_id, material_type,
-        language, semester, teacher, tags, version, access_level, uploaded_by,
-        external_url, remote_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      data.title || 'Без названия',
-      data.author || '',
-      data.year || null,
-      data.isbn || null,
-      data.description || '',
-      data.cover_url || '',
-      data.file_path || null,
-      data.is_downloaded ? 1 : 0,
-      data.source || 'api',
-      data.ol_key || null,
-      data.ia_id || null,
-      data.gutenberg_id || null,
-      data.has_fulltext ? 1 : 0,
-      data.discipline_id || null,
-      data.course_id || null,
-      data.category_id || null,
-      data.speciality_id || null,
-      data.material_type || null,
-      data.language || null,
-      data.semester || null,
-      data.teacher || null,
-      data.tags || null,
-      data.version || null,
-      data.access_level || 'public',
-      data.uploaded_by || null,
-      data.external_url || null,
-      data.remote_id || null
-    ]);
-    
-    return await getBookById(result.lastInsertRowId);
+    const result = await apiRequest<any>('/books', {
+      method: 'POST',
+      body: JSON.stringify(toServerBookInput(data)),
+    });
+    return withDownloadState(normalizeBook(result));
   } catch (error) {
     console.error('Error adding book:', error);
     return null;
   }
 }
 
-export async function syncOfficialBooks(): Promise<number> {
-  const db = await getDb();
-  await runOfficialFilter();
-  const remoteBooks = await getOfficialBooks();
+export async function uploadBookFile(bookId: EntityId, file: UploadableBookFile): Promise<Book | null> {
+  const uploadAsync = (FileSystem as any).uploadAsync as undefined | ((url: string, fileUri: string, options: any) => Promise<any>);
+  const uploadType = (FileSystem as any).FileSystemUploadType?.MULTIPART ?? 1;
+  const mimeType = file.mimeType || mimeForFileName(file.name);
+  let result: any;
 
-  for (const book of remoteBooks) {
-    const externalUrl = book.externalLinks?.[0]?.url || book.officialSourceUrl || '';
-    const existing = await db.getFirstAsync<{ id: number }>(
-      'SELECT id FROM books WHERE source = ? AND remote_id = ?',
-      ['official', book.id]
-    );
-    const values = [
-      book.title,
-      book.author || '',
-      Number(book.year) || null,
-      book.publisher ? `${book.publisher}. Официальная электронная версия.` : 'Официальная электронная версия.',
-      'official',
-      book.language || null,
-      externalUrl,
-      book.id,
-    ];
+  await apiRequest('/auth/me');
 
-    if (existing) {
-      await db.runAsync(
-        'UPDATE books SET title = ?, author = ?, year = ?, description = ?, source = ?, language = ?, external_url = ?, remote_id = ? WHERE id = ?',
-        [...values, existing.id]
-      );
-    } else {
-      await db.runAsync(
-        `INSERT INTO books (
-          title, author, year, description, source, language, external_url, remote_id,
-          material_type, access_level, has_fulltext, is_downloaded
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'textbook', 'public', 0, 0)`,
-        values
-      );
+  if (Platform.OS === 'web') {
+    result = await uploadBookFileWithFetch(bookId, file, mimeType);
+  } else if (uploadAsync && file.uri && !/^https?:\/\//i.test(file.uri)) {
+    const response = await uploadAsync(apiUrl(`/books/${encodeURIComponent(bookId)}/file`), file.uri, {
+      httpMethod: 'POST',
+      uploadType,
+      fieldName: 'file',
+      mimeType,
+      headers: await authHeaders(),
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(parseUploadError(response.body, response.status));
     }
+
+    result = response.body ? JSON.parse(response.body) : null;
+  } else {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: mimeType,
+    } as any);
+
+    result = await apiRequest<any>(`/books/${encodeURIComponent(bookId)}/file`, {
+      method: 'POST',
+      body: formData,
+    });
   }
 
-  return remoteBooks.length;
+  const uploadedBook = normalizeBook(result);
+  return cacheUploadedBookFile(uploadedBook, file);
 }
 
-export async function syncGutenbergBooks(limit: number = 40): Promise<number> {
-  const db = await getDb();
-  const remoteBooks = await getPopularBooks(limit);
+export async function downloadBookFile(book: Book): Promise<Book> {
+  if (!book.has_file) {
+    throw new Error('missing_server_file');
+  }
 
-  // Official publisher links stay in the dedicated online section. The main
-  // bookshelf is reserved for files that can be read inside the application.
-  await db.runAsync("DELETE FROM books WHERE source = 'official' AND remote_id IS NOT NULL");
+  if (Platform.OS === 'web') {
+    return downloadBookFileWeb(book);
+  }
 
-  for (const book of remoteBooks) {
-    const existing = await db.getFirstAsync<{ id: number }>(
-      'SELECT id FROM books WHERE source = ? AND gutenberg_id = ?',
-      ['gutenberg', book.gutenberg_id]
-    );
-    const values = [
-      book.title,
-      book.author,
-      book.description,
-      book.cover_url,
-      book.ol_key,
-      book.gutenberg_id,
-      book.source,
-    ];
+  const dir = await ensureMaterialDirectory(book.id);
 
-    if (existing) {
-      await db.runAsync(
-        `UPDATE books
-         SET title = ?, author = ?, description = ?, cover_url = ?, ol_key = ?,
-             gutenberg_id = ?, source = ?, has_fulltext = 1, external_url = NULL
-         WHERE id = ?`,
-        [...values, existing.id]
-      );
-    } else {
-      await db.runAsync(
-        `INSERT INTO books (
-          title, author, description, cover_url, ol_key, gutenberg_id, source,
-          material_type, language, access_level, has_fulltext, is_downloaded
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'book', 'en', 'public', 1, 0)`,
-        values
-      );
+  const fileName = sanitizeFileName(book.file_name || `${book.title}.${extensionFromBook(book) || 'bin'}`);
+  const destination = `${dir}${fileName}`;
+  await apiRequest('/auth/me');
+  const result = await FileSystem.downloadAsync(
+    apiUrl(`/books/${encodeURIComponent(book.id)}/file`),
+    destination,
+    { headers: await authHeaders() }
+  );
+
+  return rememberDownloadedBook(book, result.uri, fileName);
+}
+
+export async function removeDownloadedBook(bookId: EntityId): Promise<void> {
+  if (Platform.OS === 'web') {
+    const entry = webDownloadMap[bookId];
+    if (entry?.file_path?.startsWith('blob:')) {
+      URL.revokeObjectURL(entry.file_path);
     }
+    delete webDownloadMap[bookId];
+    return;
   }
 
-  return remoteBooks.length;
+  const downloads = await getDownloadMap();
+  const entry = downloads[bookId];
+  if (entry?.file_path) {
+    await FileSystem.deleteAsync(entry.file_path, { idempotent: true });
+  }
+  delete downloads[bookId];
+  await setDownloadMap(downloads);
 }
 
-export async function updateBook(id: number, updates: Partial<Book>): Promise<void> {
-  const db = await getDb();
-  const setClauses: string[] = [];
-  const params: any[] = [];
+export async function syncGutenbergBooks(): Promise<number> {
+  // The app now uses the centralized backend catalog. Gutenberg imports should be done server-side.
+  return 0;
+}
 
-  for (const [key, value] of Object.entries(updates)) {
-    setClauses.push(`${key} = ?`);
-    params.push(value);
+export async function updateBook(id: EntityId, updates: Partial<Book>): Promise<void> {
+  const current = await getBookById(id);
+  if (!current) return;
+  await apiRequest(`/books/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(toServerBookInput({ ...current, ...updates })),
+  });
+}
+
+export async function deleteBook(id: EntityId): Promise<void> {
+  await apiRequest(`/books/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  await removeDownloadedBook(id);
+}
+
+export async function assignDiscipline(bookId: EntityId, disciplineId: EntityId): Promise<void> {
+  await updateBook(bookId, { discipline_id: disciplineId });
+}
+
+function toServerBookInput(data: Partial<Book>) {
+  return {
+    title: data.title,
+    author: data.author,
+    year: data.year,
+    isbn: data.isbn,
+    description: data.description,
+    cover_url: data.cover_url,
+    source: data.source || 'api',
+    ol_key: data.ol_key,
+    ia_id: data.ia_id,
+    gutenberg_id: data.gutenberg_id,
+    has_fulltext: Boolean(data.has_fulltext),
+    discipline_id: data.discipline_id,
+    course_id: data.course_id,
+    category_id: data.category_id,
+    speciality_id: data.speciality_id,
+    material_type: data.material_type,
+    language: data.language,
+    semester: data.semester,
+    teacher: data.teacher,
+    tags: data.tags,
+    version: data.version,
+    access_level: data.access_level || 'public',
+    uploaded_by: data.uploaded_by,
+    external_url: data.external_url,
+    remote_id: data.remote_id,
+    file_name: data.file_name,
+    file_size: data.file_size,
+    content_type: data.content_type,
+  };
+}
+
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[\\/:*?"<>|]+/g, '_').slice(0, 180);
+}
+
+async function cacheUploadedBookFile(book: Book, file: UploadableBookFile): Promise<Book> {
+  const fileName = sanitizeFileName(book.file_name || file.name || `${book.title}.${extensionFromBook(book) || 'bin'}`);
+
+  if (Platform.OS === 'web') {
+    let objectUrl = file.uri;
+    if (file.webFile && typeof URL !== 'undefined') {
+      objectUrl = URL.createObjectURL(file.webFile);
+    }
+    return rememberDownloadedBook(book, objectUrl, fileName);
   }
 
-  if (setClauses.length === 0) return;
-
-  params.push(id);
-  await db.runAsync(`UPDATE books SET ${setClauses.join(', ')} WHERE id = ?`, params);
+  try {
+    const dir = await ensureMaterialDirectory(book.id);
+    const destination = `${dir}${fileName}`;
+    if (file.uri !== destination) {
+      await FileSystem.copyAsync({ from: file.uri, to: destination });
+    }
+    return rememberDownloadedBook(book, destination, fileName);
+  } catch (error) {
+    console.warn('Could not cache uploaded book locally:', error);
+    return withDownloadState(book);
+  }
 }
 
-export async function deleteBook(id: number): Promise<void> {
-  const db = await getDb();
-  await db.runAsync('DELETE FROM books WHERE id = ?', [id]);
+async function uploadBookFileWithFetch(bookId: EntityId, file: UploadableBookFile, mimeType: string) {
+  const formData = new FormData();
+
+  if (file.webFile) {
+    formData.append('file', file.webFile, file.name);
+  } else {
+    const fileResponse = await fetch(file.uri);
+    const blob = await fileResponse.blob();
+    formData.append('file', blob, file.name);
+  }
+
+  const response = await fetch(apiUrl(`/books/${encodeURIComponent(bookId)}/file`), {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: formData,
+  });
+  const body = await response.text();
+  if (!response.ok) {
+    throw new Error(parseUploadError(body, response.status));
+  }
+
+  return body ? JSON.parse(body) : null;
 }
 
-export async function assignDiscipline(bookId: number, disciplineId: number): Promise<void> {
-  const db = await getDb();
-  await db.runAsync('UPDATE books SET discipline_id = ? WHERE id = ?', [disciplineId, bookId]);
+async function downloadBookFileWeb(book: Book): Promise<Book> {
+  const response = await fetch(apiUrl(`/books/${encodeURIComponent(book.id)}/file`), {
+    headers: await authHeaders(),
+  });
+  const body = await response.blob();
+  if (!response.ok) {
+    throw new Error(parseUploadError(await body.text(), response.status));
+  }
+
+  const fileName = sanitizeFileName(book.file_name || `${book.title}.${extensionFromBook(book) || 'bin'}`);
+  const objectUrl = URL.createObjectURL(new Blob([body], { type: book.content_type || mimeForFileName(fileName) }));
+  return rememberDownloadedBook(book, objectUrl, fileName);
+}
+
+function parseUploadError(body: string | undefined, status: number) {
+  if (body) {
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed?.error) return parsed.error;
+    } catch {}
+  }
+  return `Backend returned ${status}`;
+}
+
+function extensionFromBook(book: Book) {
+  return (book.file_name || book.external_url || '').split('?')[0].split('.').pop()?.toLowerCase() || '';
+}
+
+function mimeForFileName(fileName: string) {
+  const ext = fileName.split('?')[0].split('.').pop()?.toLowerCase();
+  if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'epub') return 'application/epub+zip';
+  if (ext === 'txt') return 'text/plain';
+  return 'application/octet-stream';
 }

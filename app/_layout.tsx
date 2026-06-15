@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { PaperProvider, MD3LightTheme } from 'react-native-paper';
-import { initDb } from '../services/db';
 import { THEME } from '../constants/theme';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
@@ -60,24 +59,6 @@ function AuthGuard() {
 }
 
 export default function RootLayout() {
-  const [dbInitialized, setDbInitialized] = useState(false);
-
-  useEffect(() => {
-    async function setup() {
-      try {
-        await initDb();
-        setDbInitialized(true);
-      } catch (e) {
-        console.error("DB Init error", e);
-      }
-    }
-    setup();
-  }, []);
-
-  if (!dbInitialized) {
-    return null; // Or a loading spinner
-  }
-
   return (
     <SafeAreaProvider>
       <LanguageProvider>

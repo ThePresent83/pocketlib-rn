@@ -1,78 +1,142 @@
-import { getDb } from './db';
+import { apiRequest, AuthTokens, clearStoredTokens, getStoredTokens, setStoredTokens } from './backendApi';
+import { EntityId } from './disciplineService';
 
 export interface User {
-  id: number;
+  id: EntityId;
   full_name: string;
   email: string;
+  login?: string;
   role: 'student' | 'teacher' | 'admin';
-  speciality_id?: number;
-  course_id?: number;
+  speciality_id?: EntityId;
+  course_id?: EntityId;
   group_name?: string;
-  created_at: string;
+  group_id?: EntityId;
+  created_at?: string;
+}
+
+interface AuthResult {
+  user: {
+    id: EntityId;
+    login?: string;
+    email?: string;
+    full_name?: string;
+    role: User['role'];
+  };
+  tokens: AuthTokens;
+}
+
+function normalizeUser(input: any): User {
+  return {
+    id: input.id,
+    login: input.login,
+    email: input.email || input.login,
+    full_name: input.full_name || input.login || input.email,
+    role: normalizeRole(input.role),
+    group_id: input.group_id,
+    group_name: input.group_name,
+    created_at: input.created_at,
+  };
+}
+
+function normalizeRole(role: string): User['role'] {
+  const value = String(role || '').toLowerCase();
+  if (value === 'admin') return 'admin';
+  if (value === 'teacher') return 'teacher';
+  return 'student';
+}
+
+async function applyAuthResult(result: AuthResult): Promise<User> {
+  await setStoredTokens(result.tokens);
+  return normalizeUser(result.user);
 }
 
 export async function login(email: string, password: string): Promise<User | null> {
-  const db = await getDb();
-  // В MVP используем простое сравнение паролей. В реальном приложении использовать bcrypt.
-  const user = await db.getFirstAsync('SELECT * FROM users WHERE email = ? AND password = ?', [email, password]);
-  
-  if (user) {
-    const { password: _, ...userWithoutPassword } = user as any;
-    return userWithoutPassword as User;
+  try {
+    const result = await apiRequest<AuthResult>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, login: email, password }),
+    }, false);
+    return applyAuthResult(result);
+  } catch (error) {
+    console.error('Login error:', error);
+    return null;
   }
-  return null;
 }
 
-export async function register(data: { full_name: string, email: string, password: string, role?: string, speciality_id?: number, course_id?: number, group_name?: string }): Promise<User | null> {
-  const db = await getDb();
-  
+export async function register(data: {
+  full_name: string;
+  email: string;
+  password: string;
+  role?: string;
+  speciality_id?: EntityId;
+  course_id?: EntityId;
+  group_name?: string;
+  group_id?: EntityId;
+}): Promise<User | null> {
   try {
-    const result = await db.runAsync(`
-      INSERT INTO users (full_name, email, password, role, speciality_id, course_id, group_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [
-      data.full_name, 
-      data.email, 
-      data.password, 
-      data.role || 'student',
-      data.speciality_id || null,
-      data.course_id || null,
-      data.group_name || null
-    ]);
-
-    const user = await db.getFirstAsync('SELECT * FROM users WHERE id = ?', [result.lastInsertRowId]);
-    if (user) {
-      const { password: _, ...userWithoutPassword } = user as any;
-      return userWithoutPassword as User;
-    }
-    return null;
+    const result = await apiRequest<AuthResult>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        full_name: data.full_name,
+        email: data.email,
+        login: data.email,
+        password: data.password,
+        group_id: data.group_id,
+      }),
+    }, false);
+    return applyAuthResult(result);
   } catch (error) {
     console.error('Registration error:', error);
     return null;
   }
 }
 
-export async function getUserById(id: number): Promise<User | null> {
-  const db = await getDb();
-  const user = await db.getFirstAsync('SELECT * FROM users WHERE id = ?', [id]);
-  if (user) {
-    const { password: _, ...userWithoutPassword } = user as any;
-    return userWithoutPassword as User;
+export async function restoreSession(): Promise<User | null> {
+  const tokens = await getStoredTokens();
+  if (!tokens) return null;
+
+  try {
+    const user = await apiRequest<any>('/auth/me');
+    return normalizeUser(user);
+  } catch (error) {
+    console.error('Session restore error:', error);
+    await clearStoredTokens();
+    return null;
   }
-  return null;
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await apiRequest('/auth/logout', { method: 'POST' });
+  } catch {
+    // Local token cleanup is enough if the server is offline.
+  } finally {
+    await clearStoredTokens();
+  }
+}
+
+export async function getUserById(id: EntityId): Promise<User | null> {
+  try {
+    const user = await apiRequest<any>(`/users/${encodeURIComponent(id)}`);
+    return normalizeUser(user);
+  } catch {
+    return null;
+  }
 }
 
 export async function getAllUsers(): Promise<User[]> {
-  const db = await getDb();
-  return await db.getAllAsync<User>('SELECT id, full_name, email, role, speciality_id, course_id, group_name, created_at FROM users ORDER BY id');
+  const users = await apiRequest<any[]>('/users?limit=200');
+  return users.map(normalizeUser);
 }
 
-export async function updateUserRole(id: number, role: User['role']): Promise<void> {
-  const db = await getDb();
-  await db.runAsync('UPDATE users SET role = ? WHERE id = ?', [role, id]);
+export async function updateUserRole(id: EntityId, role: User['role']): Promise<void> {
+  await apiRequest(`/users/${encodeURIComponent(id)}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
 }
 
-export async function deleteUser(id: number): Promise<void> {
-  const db = await getDb();
-  await db.runAsync('DELETE FROM users WHERE id = ? AND email <> ?', [id, 'admin@university.edu']);
+export async function deleteUser(id: EntityId): Promise<void> {
+  await apiRequest(`/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
+
