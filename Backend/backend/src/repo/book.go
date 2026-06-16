@@ -68,6 +68,28 @@ type BookContentFileUpdate struct {
 	FileName        string
 	FileSize        int64
 	ContentType     string
+	CoverS3Key      *string
+	CoverS3Bucket   *string
+	CoverURL        *string
+}
+
+type BookCoverStorageUpdate struct {
+	ID              string
+	CoverS3Key      string
+	CoverS3Bucket   string
+	CoverURL        string
+}
+
+type BookStorageInfo struct {
+	ID              string
+	Title           string
+	CoverURL        *string
+	ContentS3Key    *string
+	ContentS3Bucket *string
+	FileName        *string
+	ContentType     *string
+	CoverS3Key      *string
+	CoverS3Bucket   *string
 }
 
 func NewBookRepo(db sqlc.DBTX) *BookRepo {
@@ -224,6 +246,9 @@ func (repo *BookRepo) UpdateBookContentFile(ctx context.Context, input BookConte
 			file_name = $4,
 			file_size = $5,
 			content_type = $6,
+			cover_s3_key = COALESCE($7, cover_s3_key),
+			cover_s3_bucket = COALESCE($8, cover_s3_bucket),
+			cover_url = COALESCE($9, cover_url),
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = $1
 		RETURNING `+bookColumns(""),
@@ -233,6 +258,9 @@ func (repo *BookRepo) UpdateBookContentFile(ctx context.Context, input BookConte
 		input.FileName,
 		input.FileSize,
 		input.ContentType,
+		textPtrOrNull(input.CoverS3Key),
+		textPtrOrNull(input.CoverS3Bucket),
+		textPtrOrNull(input.CoverURL),
 	))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Book{}, domain.ErrNotFound
@@ -240,9 +268,97 @@ func (repo *BookRepo) UpdateBookContentFile(ctx context.Context, input BookConte
 	return book, err
 }
 
+func (repo *BookRepo) GetBookStorageInfo(ctx context.Context, id string) (BookStorageInfo, error) {
+	bookID, err := uuidStringOrError(id)
+	if err != nil {
+		return BookStorageInfo{}, err
+	}
+
+	var (
+		info            BookStorageInfo
+		coverURL        pgtype.Text
+		contentS3Key    pgtype.Text
+		contentS3Bucket pgtype.Text
+		fileName        pgtype.Text
+		contentType     pgtype.Text
+		coverS3Key      pgtype.Text
+		coverS3Bucket   pgtype.Text
+	)
+
+	err = repo.db.QueryRow(ctx, `
+		SELECT
+			id::TEXT,
+			title,
+			cover_url,
+			content_s3_key,
+			content_s3_bucket,
+			file_name,
+			content_type,
+			cover_s3_key,
+			cover_s3_bucket
+		FROM books
+		WHERE id = $1
+	`, bookID).Scan(
+		&info.ID,
+		&info.Title,
+		&coverURL,
+		&contentS3Key,
+		&contentS3Bucket,
+		&fileName,
+		&contentType,
+		&coverS3Key,
+		&coverS3Bucket,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return BookStorageInfo{}, domain.ErrNotFound
+	}
+	if err != nil {
+		return BookStorageInfo{}, err
+	}
+
+	info.CoverURL = pgTextPtr(coverURL)
+	info.ContentS3Key = pgTextPtr(contentS3Key)
+	info.ContentS3Bucket = pgTextPtr(contentS3Bucket)
+	info.FileName = pgTextPtr(fileName)
+	info.ContentType = pgTextPtr(contentType)
+	info.CoverS3Key = pgTextPtr(coverS3Key)
+	info.CoverS3Bucket = pgTextPtr(coverS3Bucket)
+	return info, nil
+}
+
+func (repo *BookRepo) UpdateBookCoverStorage(ctx context.Context, input BookCoverStorageUpdate) error {
+	bookID, err := uuidStringOrError(input.ID)
+	if err != nil {
+		return err
+	}
+
+	tag, err := repo.db.Exec(ctx, `
+		UPDATE books
+		SET
+			cover_s3_key = $2,
+			cover_s3_bucket = $3,
+			cover_url = $4,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`, bookID, input.CoverS3Key, input.CoverS3Bucket, input.CoverURL)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
 func (repo *BookRepo) DeleteBook(ctx context.Context, id string) error {
 	bookID, err := uuidStringOrError(id)
 	if err != nil {
+		return err
+	}
+	if err := repo.deleteBookReferences(ctx, "reading_history", bookID); err != nil {
+		return err
+	}
+	if err := repo.deleteBookReferences(ctx, "book_reads", bookID); err != nil {
 		return err
 	}
 	tag, err := repo.db.Exec(ctx, `DELETE FROM books WHERE id = $1`, bookID)
@@ -253,6 +369,18 @@ func (repo *BookRepo) DeleteBook(ctx context.Context, id string) error {
 		return domain.ErrNotFound
 	}
 	return nil
+}
+
+func (repo *BookRepo) deleteBookReferences(ctx context.Context, tableName string, bookID pgtype.UUID) error {
+	var exists bool
+	if err := repo.db.QueryRow(ctx, `SELECT to_regclass($1) IS NOT NULL`, "public."+tableName).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
+	_, err := repo.db.Exec(ctx, `DELETE FROM `+tableName+` WHERE book_id = $1`, bookID)
+	return err
 }
 
 func (repo *BookRepo) scanBook(row pgx.Row) (domain.Book, error) {

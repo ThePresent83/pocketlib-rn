@@ -1,6 +1,7 @@
 package servisec
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -68,6 +69,39 @@ func (storage *S3Storage) UploadFile(ctx context.Context, filename string, sizeI
 		Body:          reader,
 		ContentLength: aws.Int64(sizeInBytes),
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &uploadedFile, nil
+}
+
+func (storage *S3Storage) UploadBytes(ctx context.Context, filename string, contentType string, data []byte) (*UploadedFile, error) {
+	if !storage.Enabled() {
+		return nil, ErrS3Disabled
+	}
+
+	s3Key, err := storage.createFileKey(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	uploadedFile := UploadedFile{
+		S3Key:    s3Key,
+		S3Bucket: storage.bucketMain,
+	}
+
+	input := &s3.PutObjectInput{
+		Bucket:        aws.String(uploadedFile.S3Bucket),
+		Key:           aws.String(uploadedFile.S3Key),
+		Body:          bytes.NewReader(data),
+		ContentLength: aws.Int64(int64(len(data))),
+	}
+	if strings.TrimSpace(contentType) != "" {
+		input.ContentType = aws.String(contentType)
+	}
+
+	_, err = storage.client.PutObject(ctx, input)
 	if err != nil {
 		return nil, err
 	}

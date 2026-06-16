@@ -16,7 +16,9 @@ type BookRepo interface {
 	CreateBook(ctx context.Context, input repo.BookUpsert) (domain.Book, error)
 	UpdateBook(ctx context.Context, id string, input repo.BookUpsert) (domain.Book, error)
 	GetBook(ctx context.Context, id string) (domain.Book, error)
+	GetBookStorageInfo(ctx context.Context, id string) (repo.BookStorageInfo, error)
 	UpdateBookContentFile(ctx context.Context, input repo.BookContentFileUpdate) (domain.Book, error)
+	UpdateBookCoverStorage(ctx context.Context, input repo.BookCoverStorageUpdate) error
 	ListBooks(ctx context.Context, filter repo.BookFilters) ([]domain.Book, error)
 	DeleteBook(ctx context.Context, id string) error
 }
@@ -116,7 +118,22 @@ func (service *BookService) ListBooks(ctx context.Context, filter ListBooksFilte
 }
 
 func (service *BookService) DeleteBook(ctx context.Context, id string) error {
-	return service.repo.DeleteBook(ctx, strings.TrimSpace(id))
+	id = strings.TrimSpace(id)
+	info, err := service.repo.GetBookStorageInfo(ctx, id)
+	if err != nil && !errors.Is(err, domain.ErrNotFound) {
+		return err
+	}
+
+	if err := service.repo.DeleteBook(ctx, id); err != nil {
+		return err
+	}
+
+	if service.storage != nil && service.storage.Enabled() {
+		service.deleteStoredFile(ctx, info.ContentS3Key, info.ContentS3Bucket)
+		service.deleteStoredFile(ctx, info.CoverS3Key, info.CoverS3Bucket)
+	}
+
+	return nil
 }
 
 func (service *BookService) UploadBookFile(ctx context.Context, bookID string, file multipart.File, header *multipart.FileHeader) (domain.Book, error) {
@@ -128,6 +145,8 @@ func (service *BookService) UploadBookFile(ctx context.Context, bookID string, f
 		return domain.Book{}, err
 	}
 
+	cover := service.createAndUploadCover(ctx, strings.TrimSpace(bookID), header, file)
+
 	return service.repo.UpdateBookContentFile(ctx, repo.BookContentFileUpdate{
 		ID:              strings.TrimSpace(bookID),
 		ContentS3Key:    uploadedFile.S3Key,
@@ -135,6 +154,9 @@ func (service *BookService) UploadBookFile(ctx context.Context, bookID string, f
 		FileName:        header.Filename,
 		FileSize:        header.Size,
 		ContentType:     header.Header.Get("Content-Type"),
+		CoverS3Key:      cover.s3Key,
+		CoverS3Bucket:   cover.s3Bucket,
+		CoverURL:        cover.url,
 	})
 }
 
@@ -176,10 +198,111 @@ func (service *BookService) BookFileURL(ctx context.Context, bookID string) (str
 	return publicURL.String(), nil
 }
 
+func (service *BookService) BookCover(ctx context.Context, bookID string) (BookFileObject, error) {
+	if service.storage == nil {
+		return BookFileObject{}, ErrS3Disabled
+	}
+
+	info, err := service.repo.GetBookStorageInfo(ctx, strings.TrimSpace(bookID))
+	if err != nil {
+		return BookFileObject{}, err
+	}
+
+	if info.CoverS3Key != nil && strings.TrimSpace(*info.CoverS3Key) != "" {
+		object, err := service.storage.Get(ctx, stringValue(info.CoverS3Bucket), *info.CoverS3Key)
+		if err != nil {
+			return BookFileObject{}, err
+		}
+		return BookFileObject{Object: object, FileName: filepath.Base(*info.CoverS3Key)}, nil
+	}
+
+	if info.ContentS3Key == nil || strings.TrimSpace(*info.ContentS3Key) == "" {
+		return BookFileObject{}, ErrBookFileNotFound
+	}
+
+	sourceObject, err := service.storage.Get(ctx, stringValue(info.ContentS3Bucket), *info.ContentS3Key)
+	if err != nil {
+		return BookFileObject{}, err
+	}
+	defer sourceObject.Body.Close()
+
+	filename := "book"
+	if info.FileName != nil && strings.TrimSpace(*info.FileName) != "" {
+		filename = *info.FileName
+	}
+	contentType := sourceObject.ContentType
+	if info.ContentType != nil && strings.TrimSpace(*info.ContentType) != "" {
+		contentType = *info.ContentType
+	}
+
+	cover, err := generateBookCover(ctx, filename, contentType, sourceObject.Body)
+	if err != nil {
+		return BookFileObject{}, ErrCoverUnavailable
+	}
+
+	uploadedCover, err := service.storage.UploadBytes(ctx, cover.FileName, cover.ContentType, cover.Data)
+	if err != nil {
+		return BookFileObject{}, err
+	}
+
+	relativeURL := "/books/" + strings.TrimSpace(bookID) + "/cover"
+	if err := service.repo.UpdateBookCoverStorage(ctx, repo.BookCoverStorageUpdate{
+		ID:              strings.TrimSpace(bookID),
+		CoverS3Key:      uploadedCover.S3Key,
+		CoverS3Bucket:   uploadedCover.S3Bucket,
+		CoverURL:        relativeURL,
+	}); err != nil {
+		return BookFileObject{}, err
+	}
+
+	object, err := service.storage.Get(ctx, uploadedCover.S3Bucket, uploadedCover.S3Key)
+	if err != nil {
+		return BookFileObject{}, err
+	}
+	return BookFileObject{Object: object, FileName: cover.FileName}, nil
+}
+
 func (service *BookService) CopyToWriter(object StoredObject, writer io.Writer) error {
 	defer object.Body.Close()
 	_, err := io.Copy(writer, object.Body)
 	return err
+}
+
+type uploadedCoverRefs struct {
+	s3Key    *string
+	s3Bucket *string
+	url      *string
+}
+
+func (service *BookService) createAndUploadCover(ctx context.Context, bookID string, header *multipart.FileHeader, file multipart.File) uploadedCoverRefs {
+	if seeker, ok := file.(io.Seeker); ok {
+		_, _ = seeker.Seek(0, io.SeekStart)
+		defer seeker.Seek(0, io.SeekStart)
+	}
+
+	cover, err := generateBookCover(ctx, header.Filename, header.Header.Get("Content-Type"), file)
+	if err != nil {
+		return uploadedCoverRefs{}
+	}
+
+	uploadedCover, err := service.storage.UploadBytes(ctx, cover.FileName, cover.ContentType, cover.Data)
+	if err != nil {
+		return uploadedCoverRefs{}
+	}
+
+	relativeURL := "/books/" + strings.TrimSpace(bookID) + "/cover"
+	return uploadedCoverRefs{
+		s3Key:    &uploadedCover.S3Key,
+		s3Bucket: &uploadedCover.S3Bucket,
+		url:      &relativeURL,
+	}
+}
+
+func (service *BookService) deleteStoredFile(ctx context.Context, s3Key *string, s3Bucket *string) {
+	if s3Key == nil || strings.TrimSpace(*s3Key) == "" {
+		return
+	}
+	_ = service.storage.DeleteFile(ctx, *s3Key, stringValue(s3Bucket))
 }
 
 func createBookParams(input BookInput) repo.BookUpsert {
@@ -230,4 +353,3 @@ func createBookParams(input BookInput) repo.BookUpsert {
 		ContentType:     trimPtr(input.ContentType),
 	}
 }
-

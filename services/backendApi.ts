@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+declare const process: { env?: { EXPO_PUBLIC_API_URL?: string } } | undefined;
+
 const ACCESS_TOKEN_KEY = 'pocketlib_access_token';
 const REFRESH_TOKEN_KEY = 'pocketlib_refresh_token';
 const API_URL_OVERRIDE_KEY = 'pocketlib_api_url_override';
@@ -18,6 +20,11 @@ function normalizeApiUrl(value: string) {
 }
 
 function inferApiUrl() {
+  const envConfigured = typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_API_URL : undefined;
+  if (typeof envConfigured === 'string' && envConfigured.trim()) {
+    return normalizeApiUrl(envConfigured);
+  }
+
   const configured = Constants.expoConfig?.extra?.apiUrl;
   if (typeof configured === 'string' && configured.trim()) {
     return normalizeApiUrl(configured);
