@@ -16,6 +16,8 @@
     "build:apk:easy": "powershell -ExecutionPolicy Bypass -File scripts/build-apk-local.ps1",
     "build:apk:offline": "powershell -ExecutionPolicy Bypass -File scripts/build-apk-local.ps1",
     "build:apk:eas": "powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1",
+    "build:apk:eas:sh": "sh scripts/build-apk.sh",
+    "build:apk:eas:debian": "sh scripts/build-apk.sh",
     "build:apk": "powershell -ExecutionPolicy Bypass -File scripts/build-apk-local.ps1",
     "build:apk:local": "powershell -ExecutionPolicy Bypass -File scripts/build-apk-local.ps1",
     "build:aab": "npx eas-cli@latest build --platform android --profile production"
