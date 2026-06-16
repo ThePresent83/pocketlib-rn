@@ -5,6 +5,7 @@
   "scripts": {
     "start": "expo start",
     "dev:pocketlib": "powershell -ExecutionPolicy Bypass -File scripts/start-pocketlib.ps1",
+    "dev:pocketlib:server": "sh scripts/start-pocketlib.sh",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
