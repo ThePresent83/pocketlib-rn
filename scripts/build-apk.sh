@@ -41,6 +41,14 @@ die() {
   exit 1
 }
 
+eas() {
+  if command -v eas >/dev/null 2>&1; then
+    command eas "$@"
+  else
+    npx --yes eas-cli@latest "$@"
+  fi
+}
+
 get_arg_value() {
   [ "$#" -ge 2 ] || die "Missing value for $1"
   printf "%s" "$2"
@@ -215,11 +223,11 @@ NODE
 
 step "EAS Android build"
 if [ -z "${EXPO_TOKEN:-}" ]; then
-  if ! npx eas-cli@latest whoami --non-interactive >/dev/null 2>&1; then
+  if ! eas whoami --non-interactive >/dev/null 2>&1; then
     cat <<'EOF'
 
 EAS cloud build requires an Expo account.
-Run: npx eas-cli@latest login
+Run: npx --yes eas-cli@latest login
 
 No Expo account? Build locally instead:
 npm run build:apk:easy
@@ -248,7 +256,7 @@ printf "EAS project ID: %s\n" "$EAS_PROJECT_ID"
 
 if [ "$DRY_RUN" -eq 1 ]; then
   printf "Would write EXPO_PUBLIC_API_URL=%s to eas.json profile '%s'\n" "$API_URL" "$PROFILE"
-  printf "Dry run command: npx eas-cli@latest build --platform android --profile %s --non-interactive --wait" "$PROFILE"
+  printf "Dry run command: npx --yes eas-cli@latest build --platform android --profile %s --non-interactive --wait" "$PROFILE"
   if [ "$LOCAL" -eq 1 ]; then
     printf " --local"
   fi
@@ -260,9 +268,9 @@ set_eas_profile_api_url
 printf "EAS env EXPO_PUBLIC_API_URL: %s\n" "$API_URL"
 
 if [ "$LOCAL" -eq 1 ]; then
-  npx eas-cli@latest build --platform android --profile "$PROFILE" --non-interactive --wait --local
+  eas build --platform android --profile "$PROFILE" --non-interactive --wait --local
 else
-  npx eas-cli@latest build --platform android --profile "$PROFILE" --non-interactive --wait
+  eas build --platform android --profile "$PROFILE" --non-interactive --wait
 fi
 
 if [ "$NO_DOWNLOAD" -eq 1 ] || [ "$LOCAL" -eq 1 ]; then
@@ -280,5 +288,5 @@ else
 fi
 ARTIFACT_PATH="$OUTPUT_DIR/pocketlib-$PROFILE-$TIMESTAMP.$EXTENSION"
 
-npx eas-cli@latest build:download --platform android --latest --path "$ARTIFACT_PATH" --non-interactive
+eas build:download --platform android --latest --path "$ARTIFACT_PATH" --non-interactive
 printf "\nDone: %s\n" "$ARTIFACT_PATH"
