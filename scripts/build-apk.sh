@@ -223,7 +223,8 @@ NODE
 
 step "EAS Android build"
 if [ -z "${EXPO_TOKEN:-}" ]; then
-  if ! eas whoami --non-interactive >/dev/null 2>&1; then
+  EXPO_USER=$(eas whoami 2>/dev/null || true)
+  if [ -z "$EXPO_USER" ]; then
     cat <<'EOF'
 
 EAS cloud build requires an Expo account.
@@ -234,6 +235,9 @@ npm run build:apk:easy
 EOF
     exit 1
   fi
+  printf "Expo account: %s\n" "$EXPO_USER"
+else
+  printf "Expo account: EXPO_TOKEN is set\n"
 fi
 
 EAS_PROJECT_ID=$(get_eas_project_id)
