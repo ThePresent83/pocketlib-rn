@@ -70,7 +70,12 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="gutendex"
-        options={{ href: null }}
+        options={{
+          title: t('gutendex'),
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="book-search" size={24} color={color} />,
+          headerShown: false,
+          href: isAdminOrTeacher ? '/gutendex' : null,
+        }}
       />
       <Tabs.Screen
         name="profile"

@@ -103,8 +103,12 @@ export default function BookDetailScreen() {
         text: t('delete'),
         style: 'destructive',
         onPress: async () => {
-          await deleteBook(book.id);
-          router.replace('/(tabs)/library');
+          try {
+            await deleteBook(book.id);
+            router.replace('/(tabs)/library');
+          } catch (error: any) {
+            setMessage(error?.message || t('save_failed'));
+          }
         },
       },
     ]);
@@ -138,6 +142,11 @@ export default function BookDetailScreen() {
       return;
     }
     if (book.has_file && !isMediaExtension(ext)) {
+      await rememberRecentBook(book.id);
+      router.push(`/reader/${book.id}`);
+      return;
+    }
+    if (book.gutenberg_id && book.has_fulltext) {
       await rememberRecentBook(book.id);
       router.push(`/reader/${book.id}`);
       return;
@@ -213,8 +222,9 @@ export default function BookDetailScreen() {
   const currentCourse = courses.find((course) => course.id === book.course_id);
   const fileExt = getFileExtension(book.file_name || book.file_path || book.external_url);
   const isMediaDocument = isMediaExtension(fileExt);
-  const internalReaderAvailable = Boolean((book.file_path || book.has_file) && !isMediaDocument);
-  const documentAvailable = Boolean(book.file_path || book.external_url || book.has_file);
+  const gutenbergReaderAvailable = Boolean(book.gutenberg_id && book.has_fulltext);
+  const internalReaderAvailable = gutenbergReaderAvailable || Boolean((book.file_path || book.has_file) && !isMediaDocument);
+  const documentAvailable = Boolean(book.file_path || book.external_url || book.has_file || gutenbergReaderAvailable);
   const shouldDownloadBeforeOpen = Boolean(!book.is_downloaded && book.has_file && isMediaDocument);
   const typeLabels: Record<string, string> = {
     textbook: t('textbook'),

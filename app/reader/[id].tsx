@@ -7,6 +7,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBookById, Book, downloadBookFile } from '../../services/bookService';
+import { getBookText } from '../../services/api';
 import { EpubBook, loadEpub } from '../../services/epubService';
 import {
   ReaderAppearance,
@@ -299,6 +300,19 @@ export default function ReaderScreen() {
 
     if (isMediaDocument(loadedBook)) {
       await initMediaReader(loadedBook);
+      return;
+    }
+
+    if (loadedBook.gutenberg_id && loadedBook.has_fulltext) {
+      try {
+        const raw = await getBookText(loadedBook.gutenberg_id);
+        await initTextReader(raw, loadedBook);
+      } catch (error: any) {
+        setMode('media');
+        setPages([]);
+        setLoadingMsg('');
+        setSnackbarMsg(`${t('download_failed')}: ${error.message}`);
+      }
       return;
     }
 

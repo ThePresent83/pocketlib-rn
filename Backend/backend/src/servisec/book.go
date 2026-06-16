@@ -209,7 +209,7 @@ func (service *BookService) BookCover(ctx context.Context, bookID string) (BookF
 	}
 
 	if info.CoverS3Key != nil && strings.TrimSpace(*info.CoverS3Key) != "" {
-		object, err := service.storage.Get(ctx, stringValue(info.CoverS3Bucket), *info.CoverS3Key)
+		object, err := service.storage.Get(ctx, optionalString(info.CoverS3Bucket), *info.CoverS3Key)
 		if err != nil {
 			return BookFileObject{}, err
 		}
@@ -220,7 +220,7 @@ func (service *BookService) BookCover(ctx context.Context, bookID string) (BookF
 		return BookFileObject{}, ErrBookFileNotFound
 	}
 
-	sourceObject, err := service.storage.Get(ctx, stringValue(info.ContentS3Bucket), *info.ContentS3Key)
+	sourceObject, err := service.storage.Get(ctx, optionalString(info.ContentS3Bucket), *info.ContentS3Key)
 	if err != nil {
 		return BookFileObject{}, err
 	}
@@ -302,7 +302,14 @@ func (service *BookService) deleteStoredFile(ctx context.Context, s3Key *string,
 	if s3Key == nil || strings.TrimSpace(*s3Key) == "" {
 		return
 	}
-	_ = service.storage.DeleteFile(ctx, *s3Key, stringValue(s3Bucket))
+	_ = service.storage.DeleteFile(ctx, *s3Key, optionalString(s3Bucket))
+}
+
+func optionalString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
 }
 
 func createBookParams(input BookInput) repo.BookUpsert {

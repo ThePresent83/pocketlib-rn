@@ -158,6 +158,8 @@ CREATE TABLE IF NOT EXISTS books (
 	remote_id TEXT,
 	content_s3_key TEXT,
 	content_s3_bucket TEXT,
+	cover_s3_key TEXT,
+	cover_s3_bucket TEXT,
 	file_name TEXT,
 	file_size BIGINT,
 	content_type TEXT,
@@ -189,6 +191,10 @@ ALTER TABLE books ADD COLUMN IF NOT EXISTS access_level TEXT DEFAULT 'public';
 ALTER TABLE books ADD COLUMN IF NOT EXISTS uploaded_by UUID REFERENCES users (id) ON DELETE SET NULL;
 ALTER TABLE books ADD COLUMN IF NOT EXISTS external_url TEXT;
 ALTER TABLE books ADD COLUMN IF NOT EXISTS remote_id TEXT;
+ALTER TABLE books ADD COLUMN IF NOT EXISTS content_s3_key TEXT;
+ALTER TABLE books ADD COLUMN IF NOT EXISTS content_s3_bucket TEXT;
+ALTER TABLE books ADD COLUMN IF NOT EXISTS cover_s3_key TEXT;
+ALTER TABLE books ADD COLUMN IF NOT EXISTS cover_s3_bucket TEXT;
 ALTER TABLE books ADD COLUMN IF NOT EXISTS file_name TEXT;
 ALTER TABLE books ADD COLUMN IF NOT EXISTS file_size BIGINT;
 ALTER TABLE books ADD COLUMN IF NOT EXISTS content_type TEXT;

@@ -29,7 +29,8 @@ export default function MaterialCard({ item, onPress, isFavorite, onToggleFavori
   };
   const fileExt = getFileExtension(item.file_name || item.file_path || item.external_url);
   const isMediaDocument = ['pdf', 'djvu'].includes(fileExt);
-  const canReadInside = Boolean((item.file_path || item.has_file) && !isMediaDocument);
+  const canReadGutenberg = Boolean(item.gutenberg_id && item.has_fulltext);
+  const canReadInside = canReadGutenberg || Boolean((item.file_path || item.has_file) && !isMediaDocument);
   const readHint = canReadInside
     ? t('read_in_app')
     : item.has_file && !item.is_downloaded ? t('download_for_reading') : isMediaDocument ? t('open_document') : t('open_source');

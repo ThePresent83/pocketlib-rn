@@ -67,6 +67,7 @@ func (handler *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /books", handler.listBooks)
 	mux.HandleFunc("POST /books", handler.requireStaff(handler.createBook))
 	mux.HandleFunc("GET /books/{id}", handler.getBook)
+	mux.HandleFunc("GET /books/{id}/cover", handler.bookCover)
 	mux.HandleFunc("PUT /books/{id}", handler.requireStaff(handler.updateBook))
 	mux.HandleFunc("DELETE /books/{id}", handler.requireStaff(handler.deleteBook))
 	mux.HandleFunc("POST /books/{id}/file", handler.requireStaff(handler.uploadBookFile))
@@ -369,6 +370,27 @@ func (handler *Handler) bookFileURL(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, fileURLResponse{URL: url})
 }
 
+func (handler *Handler) bookCover(w http.ResponseWriter, r *http.Request) {
+	coverFile, err := handler.books.BookCover(r.Context(), r.PathValue("id"))
+	if err != nil {
+		handler.writeServiceError(w, err)
+		return
+	}
+
+	if coverFile.Object.ContentType != "" {
+		w.Header().Set("Content-Type", coverFile.Object.ContentType)
+	}
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("Content-Disposition", "inline; filename="+strconv.Quote(coverFile.FileName))
+	if coverFile.Object.SizeBytes > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(coverFile.Object.SizeBytes, 10))
+	}
+
+	if err := handler.books.CopyToWriter(coverFile.Object, w); err != nil {
+		handler.logger.Error("failed to stream book cover", zap.Error(err))
+	}
+}
+
 func (handler *Handler) writeServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, domain.ErrInvalidID):
@@ -380,6 +402,8 @@ func (handler *Handler) writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, servisec.ErrInvalidCourse), errors.Is(err, servisec.ErrBlankName):
 		writeError(w, http.StatusBadRequest, err)
 	case errors.Is(err, servisec.ErrBookFileNotFound):
+		writeError(w, http.StatusNotFound, err)
+	case errors.Is(err, servisec.ErrCoverUnavailable):
 		writeError(w, http.StatusNotFound, err)
 	case errors.Is(err, servisec.ErrS3Disabled):
 		writeError(w, http.StatusServiceUnavailable, err)

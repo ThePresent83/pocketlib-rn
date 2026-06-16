@@ -164,12 +164,21 @@ export default function Dashboard() {
           </TouchableOpacity>
 
           {(user.role === 'admin' || user.role === 'teacher') && (
-            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/add')}>
-              <View style={[styles.iconCircle, { backgroundColor: '#FCE4EC' }]}>
-                <Icon source="plus-box" size={24} color="#C2185B" />
-              </View>
-              <Text style={styles.actionText}>{t('add')}</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/add')}>
+                <View style={[styles.iconCircle, { backgroundColor: '#FCE4EC' }]}>
+                  <Icon source="plus-box" size={24} color="#C2185B" />
+                </View>
+                <Text style={styles.actionText}>{t('add')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/gutendex')}>
+                <View style={[styles.iconCircle, { backgroundColor: '#F3E5F5' }]}>
+                  <Icon source="book-search" size={24} color="#7B1FA2" />
+                </View>
+                <Text style={styles.actionText}>{t('gutendex')}</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
 

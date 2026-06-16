@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Keyboard } from 'react-native';
 import { Text, TextInput, Button, ActivityIndicator, Snackbar, Icon } from 'react-native-paper';
-import { searchBooks, SearchResult } from '../../services/api';
+import { getPopularBooks, searchBooks, SearchResult } from '../../services/api';
 import { addBook } from '../../services/bookService';
 import { THEME } from '../../constants/theme';
 import SearchResultCard from '../../components/SearchResultCard';
@@ -15,6 +15,16 @@ export default function GutendexScreen() {
   const [hasSearched, setHasSearched] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    getPopularBooks(20).then((books) => {
+      if (active) setResults(books);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const doSearch = async () => {
     const q = query.trim();
@@ -47,6 +57,7 @@ export default function GutendexScreen() {
       gutenberg_id: item.gutenberg_id,
       has_fulltext: item.has_fulltext,
       source: item.source,
+      external_url: `https://www.gutenberg.org/ebooks/${item.gutenberg_id}`,
       is_downloaded: false,
     });
 
@@ -90,7 +101,7 @@ export default function GutendexScreen() {
         <View style={styles.statusBox}>
           <ActivityIndicator size="large" color={THEME.colors.primary} />
         </View>
-      ) : !hasSearched ? (
+      ) : !hasSearched && results.length === 0 ? (
         <View style={styles.statusBox}>
           <Icon source="book-search" size={48} color="#999" />
           <Text style={styles.statusText}>{t('find_classics_hint')}</Text>

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
+import { getStarterBooks } from './api';
 import { apiRequest, apiUrl, authHeaders } from './backendApi';
 import { EntityId } from './disciplineService';
 
@@ -71,16 +72,39 @@ type UploadableBookFile = {
 };
 
 function normalizeBook(input: any): Book {
-  return {
+  const book = {
     ...input,
     author: input.author || '',
     description: input.description || '',
-    cover_url: input.cover_url || '',
+    cover_url: normalizeCoverUrl(input),
     source: input.source || 'api',
     has_fulltext: Boolean(input.has_fulltext),
     has_file: Boolean(input.has_file || input.content_s3_key),
     is_downloaded: false,
   };
+  if (!book.cover_url && shouldUseGeneratedCover(book)) {
+    book.cover_url = apiUrl(`/books/${encodeURIComponent(book.id)}/cover`);
+  }
+  return book;
+}
+
+function normalizeCoverUrl(input: any): string {
+  const coverUrl = String(input.cover_url || '').trim();
+  if (!coverUrl) return '';
+  if (/^(https?:|blob:|data:|file:)/i.test(coverUrl)) return coverUrl;
+  if (coverUrl.startsWith('/')) return apiUrl(coverUrl);
+  return coverUrl;
+}
+
+function shouldUseGeneratedCover(book: Pick<Book, 'has_file' | 'file_name' | 'file_path' | 'content_type'>) {
+  if (!book.has_file) return false;
+  const ext = getFileExtension(book.file_name || book.file_path);
+  const contentType = (book.content_type || '').toLowerCase();
+  return ext === 'pdf' || ext === 'epub' || contentType.includes('pdf') || contentType.includes('epub');
+}
+
+function getFileExtension(path?: string): string {
+  return path?.split('?')[0].split('.').pop()?.toLowerCase() || '';
 }
 
 async function getDownloadMap(): Promise<DownloadMap> {
@@ -311,8 +335,36 @@ export async function removeDownloadedBook(bookId: EntityId): Promise<void> {
 }
 
 export async function syncGutenbergBooks(): Promise<number> {
-  // The app now uses the centralized backend catalog. Gutenberg imports should be done server-side.
-  return 0;
+  const [existingBooks, starterBooks] = await Promise.all([
+    getAllBooks(),
+    Promise.resolve(getStarterBooks(20)),
+  ]);
+  const existingIds = new Set(existingBooks.map(book => book.gutenberg_id).filter(Boolean));
+  let added = 0;
+
+  for (const item of starterBooks) {
+    if (existingIds.has(item.gutenberg_id)) continue;
+    const created = await addBook({
+      title: item.title,
+      author: item.author,
+      year: item.year,
+      isbn: item.isbn,
+      cover_url: item.cover_url,
+      ol_key: item.ol_key,
+      ia_id: item.ia_id,
+      gutenberg_id: item.gutenberg_id,
+      has_fulltext: item.has_fulltext,
+      source: item.source,
+      external_url: `https://www.gutenberg.org/ebooks/${item.gutenberg_id}`,
+      is_downloaded: false,
+    });
+    if (created) {
+      existingIds.add(item.gutenberg_id);
+      added += 1;
+    }
+  }
+
+  return added;
 }
 
 export async function updateBook(id: EntityId, updates: Partial<Book>): Promise<void> {
