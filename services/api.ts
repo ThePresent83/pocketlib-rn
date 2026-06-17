@@ -1,6 +1,8 @@
+import { apiTextRequest } from './backendApi';
+
 const BASE_URL = 'https://gutendex.com/books';
 const REQUEST_TIMEOUT_MS = 12000;
-const TEXT_REQUEST_TIMEOUT_MS = 30000;
+const TEXT_REQUEST_TIMEOUT_MS = 20000;
 
 export interface SearchResult {
   ol_key: string;
@@ -49,8 +51,13 @@ function coverUrl(id: string | number): string {
   return `https://www.gutenberg.org/cache/epub/${id}/pg${id}.cover.medium.jpg`;
 }
 
-function directTextUrl(id: string | number): string {
-  return `https://www.gutenberg.org/ebooks/${id}.txt.utf-8`;
+function directTextUrls(id: string | number): string[] {
+  return [
+    `https://www.gutenberg.org/cache/epub/${id}/pg${id}.txt`,
+    `https://www.gutenberg.org/files/${id}/${id}-0.txt`,
+    `https://www.gutenberg.org/files/${id}/${id}.txt`,
+    `https://www.gutenberg.org/ebooks/${id}.txt.utf-8`,
+  ];
 }
 
 async function fetchWithTimeout(url: string, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<Response> {
@@ -66,6 +73,41 @@ async function fetchWithTimeout(url: string, timeoutMs: number = REQUEST_TIMEOUT
 function describeNetworkError(error: unknown): string {
   if (error instanceof Error) return `${error.name}: ${error.message}`;
   return String(error);
+}
+
+function normalizeGutenbergTextUrl(url: string): string {
+  return url.replace(/^http:\/\//, 'https://');
+}
+
+function selectPlainTextUrl(formats: Record<string, string>): string {
+  const keys = Object.keys(formats);
+  const textKey = keys.find((key) => key.toLowerCase().startsWith('text/plain; charset=utf-8'))
+    || keys.find((key) => key.toLowerCase().startsWith('text/plain'))
+    || '';
+  return textKey ? normalizeGutenbergTextUrl(String(formats[textKey])) : '';
+}
+
+async function fetchTextFromUrl(url: string): Promise<string> {
+  const response = await fetchWithTimeout(url, TEXT_REQUEST_TIMEOUT_MS);
+  if (!response.ok) throw new Error(`${url} returned ${response.status}`);
+  const text = await response.text();
+  if (!text.trim()) throw new Error(`${url} returned empty text`);
+  return text;
+}
+
+async function fetchBackendGutenbergText(gutenbergId: string): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TEXT_REQUEST_TIMEOUT_MS);
+  try {
+    const text = await apiTextRequest(`/gutenberg/${encodeURIComponent(gutenbergId)}/text`, {
+      headers: { Accept: 'text/plain' },
+      signal: controller.signal,
+    });
+    if (!text.trim()) throw new Error('Backend returned empty text');
+    return text;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function starterBookToResult(book: StarterBook): SearchResult {
@@ -146,13 +188,20 @@ export async function getBookDescription(): Promise<string> {
 }
 
 export async function getBookText(gutenbergId: string): Promise<string> {
-  let directError: unknown = null;
+  const errors: string[] = [];
 
   try {
-    const directResponse = await fetchWithTimeout(directTextUrl(gutenbergId), TEXT_REQUEST_TIMEOUT_MS);
-    if (directResponse.ok) return await directResponse.text();
+    return await fetchBackendGutenbergText(gutenbergId);
   } catch (error) {
-    directError = error;
+    errors.push(`Backend: ${describeNetworkError(error)}`);
+  }
+
+  for (const url of directTextUrls(gutenbergId)) {
+    try {
+      return await fetchTextFromUrl(url);
+    } catch (error) {
+      errors.push(describeNetworkError(error));
+    }
   }
 
   try {
@@ -160,16 +209,14 @@ export async function getBookText(gutenbergId: string): Promise<string> {
     if (!response.ok) throw new Error(`Gutendex returned ${response.status}`);
     const data = await response.json();
     const formats = data.results?.[0]?.formats || {};
-    const textKey = Object.keys(formats).find((key) => key.startsWith('text/plain'));
-    if (!textKey) throw new Error('Plain text format is unavailable');
-    const textUrl = String(formats[textKey]).replace(/^http:\/\//, 'https://');
-    const textResponse = await fetchWithTimeout(textUrl, TEXT_REQUEST_TIMEOUT_MS);
-    if (!textResponse.ok) throw new Error(`Gutenberg returned ${textResponse.status}`);
-    return await textResponse.text();
+    const textUrl = selectPlainTextUrl(formats);
+    if (!textUrl) throw new Error('Plain text format is unavailable');
+    return await fetchTextFromUrl(textUrl);
   } catch (error) {
-    console.warn(
-      `Gutenberg text is unavailable for ${gutenbergId}. Direct: ${describeNetworkError(directError)}. Fallback: ${describeNetworkError(error)}`
-    );
-    return `Не удалось загрузить текст книги. Проверьте подключение к интернету и повторите попытку.\n\n${describeNetworkError(error)}`;
+    errors.push(`Gutendex: ${describeNetworkError(error)}`);
   }
+
+  const message = `Gutenberg text is unavailable for ${gutenbergId}. ${errors.slice(0, 5).join(' | ')}`;
+  console.warn(message);
+  throw new Error(message);
 }

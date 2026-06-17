@@ -120,6 +120,22 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return data as T;
 }
 
+async function parseTextResponse(response: Response): Promise<string> {
+  const text = await response.text();
+  if (!response.ok) {
+    try {
+      const data = text ? JSON.parse(text) : null;
+      throw new Error(data?.error || `Backend returned ${response.status}`);
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(text || `Backend returned ${response.status}`);
+      }
+      throw error;
+    }
+  }
+  return text;
+}
+
 async function refreshTokens() {
   const tokens = await getStoredTokens();
   if (!tokens?.refresh_token) return false;
@@ -167,4 +183,28 @@ export async function apiRequest<T>(
   }
 
   return parseResponse<T>(response);
+}
+
+export async function apiTextRequest(
+  path: string,
+  options: RequestInit = {},
+  auth: boolean = true
+): Promise<string> {
+  const baseUrl = await getApiBaseUrl();
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string> | undefined),
+  };
+
+  if (auth) {
+    Object.assign(headers, await authHeaders());
+  }
+
+  const request = () => fetch(`${baseUrl}${path.startsWith('/') ? path : `/${path}`}`, { ...options, headers });
+  let response = await request();
+  if (auth && response.status === 401 && await refreshTokens()) {
+    Object.assign(headers, await authHeaders());
+    response = await request();
+  }
+
+  return parseTextResponse(response);
 }

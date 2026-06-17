@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Text, Searchbar, IconButton, Portal, Modal, Button, List, Chip, Divider, Menu } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { THEME } from '../../constants/theme';
 import { getAllBooks, Book, BookFilters } from '../../services/bookService';
 import { getAllDisciplines, Discipline, getAllCategories, Category, EntityId } from '../../services/disciplineService';
@@ -87,10 +88,13 @@ export default function LibraryScreen() {
     setCategories(c);
   };
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     loadData();
+  }, [query, isOfflineOnly, selectedDiscipline, selectedCategory, materialType, favoritesOnly, availableOnly, sortMode]));
+
+  useEffect(() => {
     loadFilterData();
-  }, [query, isOfflineOnly, selectedDiscipline, selectedCategory, materialType, favoritesOnly, availableOnly, sortMode]);
+  }, []);
 
   useEffect(() => {
     setIsOfflineOnly(params.offline === 'true');

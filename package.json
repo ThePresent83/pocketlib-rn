@@ -9,6 +9,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "build:web:pwa": "powershell -ExecutionPolicy Bypass -File scripts/build-web-pwa.ps1",
     "check": "tsc --noEmit",
     "backend:up": "docker compose -f Backend/services-up/docker-compose.yml up --build",
     "backend:up:detached": "docker compose -f Backend/services-up/docker-compose.yml up -d --build",

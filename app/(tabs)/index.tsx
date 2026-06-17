@@ -11,6 +11,7 @@ import { getAllCoursesWithDisciplines, getAllDisciplines } from '../../services/
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getFavoriteBookIds, getRecentBookIds } from '../../services/libraryUxService';
 import { getProgress } from '../../services/readerService';
+import PwaInstallButton from '../../components/PwaInstallButton';
 
 const COLLEGE_LOGO = require('../../assets/polytech-logo.png');
 
@@ -131,6 +132,7 @@ export default function Dashboard() {
             <Text style={styles.statLabel}>{t('disciplines')}</Text>
           </View>
         </View>
+        <PwaInstallButton />
       </View>
 
       <View style={styles.content}>

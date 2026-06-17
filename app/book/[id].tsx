@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react';
-import { Alert, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Button, Card, Divider, Icon, IconButton, Menu, Snackbar, Text } from 'react-native-paper';
+import { Button, Card, Dialog, Divider, Icon, IconButton, Menu, Portal, Snackbar, Text } from 'react-native-paper';
 import Badge from '../../components/Badge';
 import { THEME } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
@@ -54,6 +54,8 @@ export default function BookDetailScreen() {
   const [downloading, setDownloading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const loadData = async () => {
     if (!id) return;
@@ -95,23 +97,23 @@ export default function BookDetailScreen() {
     setMessage(`${t('assigned_discipline')}: ${getLocalizedDisciplineName(discipline, language)}`);
   };
 
-  const confirmDelete = () => {
+  const requestDelete = () => {
     if (!book) return;
-    Alert.alert(t('delete_book_title'), `«${book.title}» ${t('delete_book_message')}`, [
-      { text: t('cancel'), style: 'cancel' },
-      {
-        text: t('delete'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteBook(book.id);
-            router.replace('/(tabs)/library');
-          } catch (error: any) {
-            setMessage(error?.message || t('save_failed'));
-          }
-        },
-      },
-    ]);
+    setDeleteDialogVisible(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!book || deleting) return;
+    setDeleting(true);
+    try {
+      await deleteBook(book.id);
+      setDeleteDialogVisible(false);
+      router.replace('/(tabs)/library');
+    } catch (error: any) {
+      setMessage(error?.message || t('save_failed'));
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const openBook = async () => {
@@ -233,6 +235,7 @@ export default function BookDetailScreen() {
     practice: t('practice'),
     book: t('books'),
   };
+  const canManageBook = user?.role === 'admin' || user?.role === 'teacher';
 
   return (
     <View style={styles.container}>
@@ -240,8 +243,8 @@ export default function BookDetailScreen() {
         <IconButton icon="arrow-left" iconColor="#fff" onPress={() => router.back()} />
         <Text variant="titleLarge" style={styles.topbarTitle} numberOfLines={1}>{book.title}</Text>
         <IconButton icon={isFavorite ? 'heart' : 'heart-outline'} iconColor="#fff" onPress={toggleFavorite} />
-        {user?.role !== 'student' && (
-          <IconButton icon="delete-outline" iconColor="#fff" onPress={confirmDelete} />
+        {canManageBook && (
+          <IconButton icon="delete-outline" iconColor="#fff" onPress={requestDelete} />
         )}
       </View>
 
@@ -342,7 +345,7 @@ export default function BookDetailScreen() {
             </Button>
           ) : null}
 
-          {user?.role !== 'student' ? (
+          {canManageBook ? (
             <>
               {!book.has_file ? (
                 <Button
@@ -373,10 +376,35 @@ export default function BookDetailScreen() {
                 />
               ))}
             </Menu>
+            <Button
+              mode="outlined"
+              icon="delete-outline"
+              textColor={THEME.colors.error}
+              disabled={deleting}
+              loading={deleting}
+              onPress={requestDelete}
+            >
+              {t('delete')}
+            </Button>
             </>
           ) : null}
         </View>
       </ScrollView>
+
+      <Portal>
+        <Dialog visible={deleteDialogVisible} onDismiss={() => !deleting && setDeleteDialogVisible(false)} style={styles.deleteDialog}>
+          <Dialog.Title>{t('delete_book_title')}</Dialog.Title>
+          <Dialog.Content>
+            <Text>{`«${book.title}» ${t('delete_book_message')}`}</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button disabled={deleting} onPress={() => setDeleteDialogVisible(false)}>{t('cancel')}</Button>
+            <Button loading={deleting} disabled={deleting} textColor={THEME.colors.error} onPress={confirmDelete}>
+              {t('delete')}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
       <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={3000}>
         {message}
@@ -411,4 +439,5 @@ const styles = StyleSheet.create({
   progressBar: { height: 6, backgroundColor: '#e0e0e0', borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: THEME.colors.primary },
   actions: { marginTop: 24, gap: 12 },
+  deleteDialog: { borderRadius: 8 },
 });

@@ -1,10 +1,15 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"backend/src/domain"
 	"backend/src/servisec"
@@ -73,6 +78,7 @@ func (handler *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /books/{id}/file", handler.requireStaff(handler.uploadBookFile))
 	mux.HandleFunc("GET /books/{id}/file", handler.requireAuth(handler.downloadBookFile))
 	mux.HandleFunc("GET /books/{id}/file-url", handler.requireAuth(handler.bookFileURL))
+	mux.HandleFunc("GET /gutenberg/{id}/text", handler.requireAuth(handler.gutenbergText))
 
 	mux.HandleFunc("GET /reader-progress/{book_id}", handler.requireAuth(handler.getReaderProgress))
 	mux.HandleFunc("PUT /reader-progress/{book_id}", handler.requireAuth(handler.saveReaderProgress))
@@ -368,6 +374,88 @@ func (handler *Handler) bookFileURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, fileURLResponse{URL: url})
+}
+
+const maxGutenbergTextBytes int64 = 16 << 20
+
+var gutenbergTextClient = &http.Client{Timeout: 35 * time.Second}
+
+func (handler *Handler) gutenbergText(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	numericID, err := strconv.Atoi(id)
+	if err != nil || numericID <= 0 {
+		writeError(w, http.StatusBadRequest, domain.ErrInvalidID)
+		return
+	}
+
+	text, sourceURL, err := fetchGutenbergText(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("X-PocketLib-Source", sourceURL)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(text))
+}
+
+func fetchGutenbergText(ctx context.Context, id string) (string, string, error) {
+	urls := []string{
+		fmt.Sprintf("https://www.gutenberg.org/cache/epub/%s/pg%s.txt", id, id),
+		fmt.Sprintf("https://www.gutenberg.org/files/%s/%s-0.txt", id, id),
+		fmt.Sprintf("https://www.gutenberg.org/files/%s/%s.txt", id, id),
+		fmt.Sprintf("https://www.gutenberg.org/ebooks/%s.txt.utf-8", id),
+	}
+
+	var lastErr error
+	for _, sourceURL := range urls {
+		text, err := fetchGutenbergTextURL(ctx, sourceURL)
+		if err == nil {
+			return text, sourceURL, nil
+		}
+		lastErr = err
+	}
+
+	if lastErr == nil {
+		lastErr = errors.New("no Gutenberg text URLs were tried")
+	}
+	return "", "", fmt.Errorf("gutenberg text unavailable for %s: %w", id, lastErr)
+}
+
+func fetchGutenbergTextURL(ctx context.Context, sourceURL string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "text/plain, */*")
+	req.Header.Set("User-Agent", "PocketLib/1.0")
+
+	resp, err := gutenbergTextClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("%s returned %d", sourceURL, resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxGutenbergTextBytes+1))
+	if err != nil {
+		return "", err
+	}
+	if int64(len(data)) > maxGutenbergTextBytes {
+		return "", fmt.Errorf("%s is larger than %d bytes", sourceURL, maxGutenbergTextBytes)
+	}
+
+	text := strings.TrimPrefix(string(data), "\ufeff")
+	if strings.TrimSpace(text) == "" {
+		return "", fmt.Errorf("%s returned empty text", sourceURL)
+	}
+
+	return text, nil
 }
 
 func (handler *Handler) bookCover(w http.ResponseWriter, r *http.Request) {
