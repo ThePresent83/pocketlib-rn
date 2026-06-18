@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
-import { Text, Card, Icon, IconButton, Avatar } from 'react-native-paper';
+import { Text, Card, Icon, IconButton, Avatar, Snackbar } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { useAuth } from '../../contexts/AuthContext';
 import { THEME } from '../../constants/theme';
@@ -26,50 +26,58 @@ export default function Dashboard() {
   const [favoriteBooks, setFavoriteBooks] = useState<Book[]>([]);
   const [stats, setStats] = useState({ total: 0, offline: 0, disciplines: 0 });
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const loadData = async () => {
-    const [all, courses, disciplines, favoriteIds, recentIds] = await Promise.all([
-      getAllBooks(),
-      getAllCoursesWithDisciplines(),
-      getAllDisciplines(),
-      getFavoriteBookIds(),
-      getRecentBookIds(),
-    ]);
-    setRecentBooks(all.slice(0, 5));
-    const offline = all.filter(b => b.is_downloaded);
-    setOfflineBooks(offline.slice(0, 5));
-    setFavoriteBooks(all.filter(book => favoriteIds.includes(book.id)).slice(0, 4));
+    try {
+      const [all, courses, disciplines, favoriteIds, recentIds] = await Promise.all([
+        getAllBooks(),
+        getAllCoursesWithDisciplines(),
+        getAllDisciplines(),
+        getFavoriteBookIds(),
+        getRecentBookIds(),
+      ]);
+      setRecentBooks(all.slice(0, 5));
+      const offline = all.filter(b => b.is_downloaded);
+      setOfflineBooks(offline.slice(0, 5));
+      setFavoriteBooks(all.filter(book => favoriteIds.includes(book.id)).slice(0, 4));
 
-    const recentRank = new Map(recentIds.map((id, index) => [id, index]));
-    const progressCandidates = (recentIds.length
-      ? recentIds.map(id => all.find(book => book.id === id)).filter(Boolean)
-      : all.slice(0, 30)) as Book[];
-    const progressPairs = await Promise.all(
-      progressCandidates.map(async book => ({ book, progress: await getProgress(`book:${book.id}`) }))
-    );
-    setContinueBooks(progressPairs
-      .filter(item => item.progress.total_pages > 0)
-      .sort((a, b) => {
-        const aRecent = recentRank.get(a.book.id) ?? 9999;
-        const bRecent = recentRank.get(b.book.id) ?? 9999;
-        return aRecent - bRecent || b.progress.page - a.progress.page;
-      })
-      .map(item => item.book)
-      .slice(0, 4));
+      const recentRank = new Map(recentIds.map((id, index) => [id, index]));
+      const progressCandidates = (recentIds.length
+        ? recentIds.map(id => all.find(book => book.id === id)).filter(Boolean)
+        : all.slice(0, 30)) as Book[];
+      const progressPairs = await Promise.all(
+        progressCandidates.map(async book => ({ book, progress: await getProgress(`book:${book.id}`) }))
+      );
+      setContinueBooks(progressPairs
+        .filter(item => item.progress.total_pages > 0)
+        .sort((a, b) => {
+          const aRecent = recentRank.get(a.book.id) ?? 9999;
+          const bRecent = recentRank.get(b.book.id) ?? 9999;
+          return aRecent - bRecent || b.progress.page - a.progress.page;
+        })
+        .map(item => item.book)
+        .slice(0, 4));
 
-    const userCourse = user?.course_id ? courses.find(course => course.id === user.course_id) : null;
-    const exactCourseMatches = user?.course_id ? all.filter(book => book.course_id === user.course_id) : [];
-    const disciplineMatches = userCourse?.discipline_id
-      ? all.filter(book => book.course_id !== user?.course_id && book.discipline_id === userCourse.discipline_id)
-      : [];
-    const fallback = all.filter(book => !exactCourseMatches.includes(book) && !disciplineMatches.includes(book));
-    setRecommendedBooks([...exactCourseMatches, ...disciplineMatches, ...fallback].slice(0, 5));
+      const userCourse = user?.course_id ? courses.find(course => course.id === user.course_id) : null;
+      const exactCourseMatches = user?.course_id ? all.filter(book => book.course_id === user.course_id) : [];
+      const disciplineMatches = userCourse?.discipline_id
+        ? all.filter(book => book.course_id !== user?.course_id && book.discipline_id === userCourse.discipline_id)
+        : [];
+      const fallback = all.filter(book => !exactCourseMatches.includes(book) && !disciplineMatches.includes(book));
+      setRecommendedBooks([...exactCourseMatches, ...disciplineMatches, ...fallback].slice(0, 5));
 
-    setStats({
-      total: all.length,
-      offline: offline.length,
-      disciplines: disciplines.length
-    });
+      setStats({
+        total: all.length,
+        offline: offline.length,
+        disciplines: disciplines.length
+      });
+      setLoadError('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Backend is unavailable';
+      console.error('Dashboard loading failed:', error);
+      setLoadError(message);
+    }
   };
 
   useEffect(() => {
@@ -85,10 +93,11 @@ export default function Dashboard() {
   if (!user) return null;
 
   return (
-    <ScrollView 
-      style={styles.container} 
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
+    <View style={styles.screen}>
+      <ScrollView
+        style={styles.container}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
       <View style={styles.welcomeSection}>
         <View style={styles.brandRow}>
           <View style={styles.brandLogoBox}>
@@ -261,11 +270,16 @@ export default function Dashboard() {
         )}
       </View>
       <View style={{ height: 40 }} />
-    </ScrollView>
+      </ScrollView>
+      <Snackbar visible={Boolean(loadError)} onDismiss={() => setLoadError('')} duration={5000}>
+        {loadError}
+      </Snackbar>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: THEME.colors.background },
   container: { flex: 1, backgroundColor: THEME.colors.background },
   welcomeSection: {
     backgroundColor: THEME.colors.primary,

@@ -156,6 +156,21 @@ async function refreshTokens() {
   return true;
 }
 
+async function fetchBackend(
+  baseUrl: string,
+  path: string,
+  options: RequestInit,
+  headers: Record<string, string>
+): Promise<Response> {
+  const url = `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+  try {
+    return await fetch(url, { ...options, headers });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Backend is unavailable at ${url}: ${detail}`);
+  }
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
@@ -175,7 +190,7 @@ export async function apiRequest<T>(
     Object.assign(headers, await authHeaders());
   }
 
-  const request = () => fetch(`${baseUrl}${path.startsWith('/') ? path : `/${path}`}`, { ...options, headers });
+  const request = () => fetchBackend(baseUrl, path, options, headers);
   let response = await request();
   if (auth && response.status === 401 && await refreshTokens()) {
     Object.assign(headers, await authHeaders());
@@ -199,7 +214,7 @@ export async function apiTextRequest(
     Object.assign(headers, await authHeaders());
   }
 
-  const request = () => fetch(`${baseUrl}${path.startsWith('/') ? path : `/${path}`}`, { ...options, headers });
+  const request = () => fetchBackend(baseUrl, path, options, headers);
   let response = await request();
   if (auth && response.status === 401 && await refreshTokens()) {
     Object.assign(headers, await authHeaders());
