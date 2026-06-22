@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { THEME } from '../../constants/theme';
 import { getApiBaseUrl, setApiBaseUrlOverride } from '../../services/backendApi';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 const COLLEGE_LOGO = require('../../assets/polytech-logo.png');
 
@@ -15,6 +16,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
   const { t } = useLanguage();
+  const { colors } = useAppTheme();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -67,17 +69,17 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView 
-      style={styles.container} 
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <View style={styles.logoPanel}>
+          <View style={[styles.logoPanel, { backgroundColor: colors.surface }]}>
             <Image source={COLLEGE_LOGO} style={styles.logo} contentFit="contain" />
           </View>
-          <Text variant="displaySmall" style={styles.title}>{t('login_title')}</Text>
-          <Text variant="titleMedium" style={styles.subtitle}>{t('college_name')}</Text>
-          <Text style={styles.caption}>{t('login_subtitle')}</Text>
+          <Text variant="displaySmall" style={[styles.title, { color: colors.primary }]}>{t('login_title')}</Text>
+          <Text variant="titleMedium" style={[styles.subtitle, { color: colors.textSecondary }]}>{t('college_name')}</Text>
+          <Text style={[styles.caption, { color: colors.textSecondary }]}>{t('login_subtitle')}</Text>
         </View>
 
         <View style={styles.form}>
@@ -88,7 +90,7 @@ export default function LoginScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
             mode="outlined"
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.surface }]}
           />
           <TextInput
             label={t('password')}
@@ -96,7 +98,7 @@ export default function LoginScreen() {
             onChangeText={setPassword}
             secureTextEntry
             mode="outlined"
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.surface }]}
           />
 
           <Button
@@ -118,10 +120,10 @@ export default function LoginScreen() {
                 autoCorrect={false}
                 keyboardType="url"
                 mode="outlined"
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.surface }]}
                 placeholder="http://192.168.1.10:8080"
               />
-              <Text style={styles.serverHint}>{t('backend_url_hint')}</Text>
+              <Text style={[styles.serverHint, { color: colors.textSecondary }]}>{t('backend_url_hint')}</Text>
               <Button mode="outlined" icon="check-network-outline" onPress={testServer}>
                 {t('test_connection')}
               </Button>

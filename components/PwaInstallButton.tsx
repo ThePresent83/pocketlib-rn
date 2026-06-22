@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { Button, Snackbar } from 'react-native-paper';
-import { THEME } from '../constants/theme';
+import { useAppTheme } from '../contexts/ThemeContext';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -14,6 +14,7 @@ function isStandaloneDisplay() {
 }
 
 export default function PwaInstallButton() {
+  const { colors } = useAppTheme();
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [message, setMessage] = useState('');
@@ -61,7 +62,7 @@ export default function PwaInstallButton() {
 
   return (
     <View style={styles.wrap}>
-      <Button mode="contained" icon="cellphone-arrow-down" buttonColor="#fff" textColor={THEME.colors.primary} onPress={install}>
+      <Button mode="contained" icon="cellphone-arrow-down" buttonColor={colors.surface} textColor={colors.primary} onPress={install}>
         Установить приложение
       </Button>
       <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={3200}>

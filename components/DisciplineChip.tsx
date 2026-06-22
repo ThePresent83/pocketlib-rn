@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 import { Chip } from 'react-native-paper';
-import { THEME } from '../constants/theme';
+import { useAppTheme } from '../contexts/ThemeContext';
 
 interface DisciplineChipProps {
   label: string;
@@ -9,6 +9,8 @@ interface DisciplineChipProps {
 }
 
 export default function DisciplineChip({ label, selected, onPress }: DisciplineChipProps) {
+  const { colors } = useAppTheme();
+
   return (
     <Chip
       mode="flat"
@@ -16,10 +18,10 @@ export default function DisciplineChip({ label, selected, onPress }: DisciplineC
       onPress={onPress}
       style={[
         styles.chip,
-        selected && { backgroundColor: THEME.colors.primary + '33' }
+        { backgroundColor: selected ? `${colors.primary}33` : colors.surfaceVariant }
       ]}
       textStyle={[
-        selected && { color: THEME.colors.primary, fontWeight: 'bold' }
+        { color: selected ? colors.primary : colors.text, fontWeight: selected ? 'bold' : 'normal' }
       ]}
     >
       {label}

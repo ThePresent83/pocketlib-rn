@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { THEME } from '../constants/theme';
+import { useAppTheme } from '../contexts/ThemeContext';
 
 interface BadgeProps {
   label: string;
@@ -9,17 +9,18 @@ interface BadgeProps {
 }
 
 export default function Badge({ label, type = 'default', icon }: BadgeProps) {
-  let bg = THEME.colors.badgeBg;
-  let color = THEME.colors.badgeText;
+  const { colors } = useAppTheme();
+  let bg = colors.badgeBg;
+  let color = colors.badgeText;
 
   if (type === 'offline') {
-    bg = THEME.colors.badgeOfflineBg;
-    color = THEME.colors.badgeOfflineText;
+    bg = colors.badgeOfflineBg;
+    color = colors.badgeOfflineText;
   } else if (type === 'lang') {
-    bg = THEME.colors.badgeLangBg;
-    color = THEME.colors.badgeLangText;
+    bg = colors.badgeLangBg;
+    color = colors.badgeLangText;
   } else if (type === 'type') {
-    bg = THEME.colors.primaryLight;
+    bg = colors.primaryLight;
     color = '#FFF';
   }
 

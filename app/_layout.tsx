@@ -1,27 +1,15 @@
 import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { PaperProvider, MD3LightTheme } from 'react-native-paper';
-import { THEME } from '../constants/theme';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { View } from 'react-native';
 import { ActivityIndicator } from 'react-native-paper';
 import { LanguageProvider } from '../contexts/LanguageContext';
-
-const paperTheme = {
-  ...MD3LightTheme,
-  colors: {
-    ...MD3LightTheme.colors,
-    primary: THEME.colors.primary,
-    primaryContainer: THEME.colors.primaryDark,
-    secondary: THEME.colors.accent,
-    background: THEME.colors.background,
-    surface: THEME.colors.surface,
-  },
-};
+import { AppThemeProvider, useAppTheme } from '../contexts/ThemeContext';
 
 function AuthGuard() {
   const { user, isLoading } = useAuth();
+  const { colors } = useAppTheme();
   const segments = useSegments();
   const router = useRouter();
 
@@ -41,8 +29,8 @@ function AuthGuard() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: THEME.colors.background }}>
-        <ActivityIndicator size="large" color={THEME.colors.primary} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -62,11 +50,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <LanguageProvider>
-        <AuthProvider>
-          <PaperProvider theme={paperTheme}>
+        <AppThemeProvider>
+          <AuthProvider>
             <AuthGuard />
-          </PaperProvider>
-        </AuthProvider>
+          </AuthProvider>
+        </AppThemeProvider>
       </LanguageProvider>
     </SafeAreaProvider>
   );

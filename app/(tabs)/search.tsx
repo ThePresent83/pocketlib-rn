@@ -6,9 +6,11 @@ import { addBook } from '../../services/bookService';
 import { THEME } from '../../constants/theme';
 import SearchResultCard from '../../components/SearchResultCard';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 export default function SearchScreen() {
   const { t } = useLanguage();
+  const { colors } = useAppTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,8 +61,8 @@ export default function SearchScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.header }]}>
         <Text variant="headlineSmall" style={styles.headerTitle}>{t('book_search')}</Text>
         <View style={styles.searchRow}>
           <TextInput
@@ -71,14 +73,15 @@ export default function SearchScreen() {
             mode="outlined"
             style={styles.input}
             outlineStyle={styles.inputOutline}
-            activeOutlineColor={THEME.colors.primary}
+            activeOutlineColor={colors.primary}
             dense
           />
           <Button
             mode="contained"
             onPress={doSearch}
             style={styles.searchBtn}
-            buttonColor={THEME.colors.accent}
+            buttonColor={colors.accent}
+            textColor={colors.primaryDark}
           >
             {t('search_button')}
           </Button>
@@ -87,17 +90,17 @@ export default function SearchScreen() {
 
       {loading ? (
         <View style={styles.statusBox}>
-          <ActivityIndicator size="large" color={THEME.colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : !hasSearched ? (
         <View style={styles.statusBox}>
-          <Icon source="magnify" size={48} color="#999" />
-          <Text style={styles.statusText}>{t('enter_query_hint')}</Text>
+          <Icon source="magnify" size={48} color={colors.textSecondary} />
+          <Text style={[styles.statusText, { color: colors.textSecondary }]}>{t('enter_query_hint')}</Text>
         </View>
       ) : results.length === 0 ? (
         <View style={styles.statusBox}>
-          <Icon source="flask-empty-outline" size={48} color="#999" />
-          <Text style={styles.statusText}>{t('nothing_found')}</Text>
+          <Icon source="flask-empty-outline" size={48} color={colors.textSecondary} />
+          <Text style={[styles.statusText, { color: colors.textSecondary }]}>{t('nothing_found')}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.resultsLayout}>

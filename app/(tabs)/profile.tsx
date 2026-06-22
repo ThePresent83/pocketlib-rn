@@ -1,5 +1,5 @@
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Avatar, Button, List, Divider, Card, SegmentedButtons, TextInput, Snackbar } from 'react-native-paper';
+import { Text, Avatar, Button, List, Divider, Card, SegmentedButtons, TextInput, Snackbar, Switch } from 'react-native-paper';
 import { useAuth } from '../../contexts/AuthContext';
 import { THEME } from '../../constants/theme';
 import { useEffect, useState } from 'react';
@@ -7,10 +7,12 @@ import { getAllBooks } from '../../services/bookService';
 import { getAllDisciplines, getAllCategories } from '../../services/disciplineService';
 import { AppLanguage, useLanguage } from '../../contexts/LanguageContext';
 import { getApiBaseUrl, setApiBaseUrlOverride } from '../../services/backendApi';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const { language, setLanguage, t } = useLanguage();
+  const { colors, isDark, toggleTheme } = useAppTheme();
   const [stats, setStats] = useState({
     totalBooks: 0,
     offlineBooks: 0,
@@ -69,34 +71,34 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface }]}>
         <Avatar.Text 
           size={80} 
           label={user.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()} 
-          style={styles.avatar}
+          style={[styles.avatar, { backgroundColor: colors.primary }]}
         />
         <Text variant="headlineSmall" style={styles.name}>{user.full_name}</Text>
-        <Text variant="bodyLarge" style={styles.role}>{roleLabels[user.role] || user.role}</Text>
-        <Text variant="bodyMedium" style={styles.email}>{user.email}</Text>
+        <Text variant="bodyLarge" style={[styles.role, { color: colors.primary }]}>{roleLabels[user.role] || user.role}</Text>
+        <Text variant="bodyMedium" style={[styles.email, { color: colors.textSecondary }]}>{user.email}</Text>
       </View>
 
       <View style={styles.statsRow}>
-        <Card style={styles.statCard}>
-          <Text style={styles.statVal}>{stats.totalBooks}</Text>
-          <Text style={styles.statLab}>{t('books')}</Text>
+        <Card style={[styles.statCard, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.statVal, { color: colors.primary }]}>{stats.totalBooks}</Text>
+          <Text style={[styles.statLab, { color: colors.textSecondary }]}>{t('books')}</Text>
         </Card>
-        <Card style={styles.statCard}>
-          <Text style={styles.statVal}>{stats.offlineBooks}</Text>
-          <Text style={styles.statLab}>{t('offline')}</Text>
+        <Card style={[styles.statCard, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.statVal, { color: colors.primary }]}>{stats.offlineBooks}</Text>
+          <Text style={[styles.statLab, { color: colors.textSecondary }]}>{t('offline')}</Text>
         </Card>
-        <Card style={styles.statCard}>
-          <Text style={styles.statVal}>{stats.disciplines}</Text>
-          <Text style={styles.statLab}>{t('disciplines')}</Text>
+        <Card style={[styles.statCard, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.statVal, { color: colors.primary }]}>{stats.disciplines}</Text>
+          <Text style={[styles.statLab, { color: colors.textSecondary }]}>{t('disciplines')}</Text>
         </Card>
       </View>
 
-      <List.Section style={styles.section}>
+      <List.Section style={[styles.section, { backgroundColor: colors.surface }]}>
         <List.Subheader>{t('profile')}</List.Subheader>
         {user.group_name && <List.Item title={t('group')} description={user.group_name} left={props => <List.Icon {...props} icon="account-group" />} />}
         <List.Item 
@@ -113,10 +115,10 @@ export default function ProfileScreen() {
 
       <Divider />
 
-      <List.Section style={styles.section}>
+      <List.Section style={[styles.section, { backgroundColor: colors.surface }]}>
         <List.Subheader>{t('settings')}</List.Subheader>
         <View style={styles.languageBox}>
-          <Text style={styles.languageTitle}>{t('language')}</Text>
+          <Text style={[styles.languageTitle, { color: colors.textSecondary }]}>{t('language')}</Text>
           <SegmentedButtons
             value={language}
             onValueChange={(value) => setLanguage(value as AppLanguage)}
@@ -128,9 +130,14 @@ export default function ProfileScreen() {
           />
         </View>
         <List.Item title={t('notifications')} left={props => <List.Icon {...props} icon="bell-outline" />} right={props => <List.Icon {...props} icon="chevron-right" />} />
-        <List.Item title={t('dark_theme')} left={props => <List.Icon {...props} icon="theme-light-dark" />} right={props => <List.Icon {...props} icon="chevron-right" />} />
+        <List.Item
+          title={t('appearance')}
+          description={t(isDark ? 'dark_theme' : 'light_theme')}
+          left={props => <List.Icon {...props} icon={isDark ? 'weather-night' : 'white-balance-sunny'} />}
+          right={() => <Switch value={isDark} onValueChange={toggleTheme} />}
+        />
         <View style={styles.serverBox}>
-          <Text style={styles.languageTitle}>{t('backend_server')}</Text>
+          <Text style={[styles.languageTitle, { color: colors.textSecondary }]}>{t('backend_server')}</Text>
           <TextInput
             label={t('backend_url')}
             value={serverUrl}
@@ -139,10 +146,10 @@ export default function ProfileScreen() {
             autoCorrect={false}
             keyboardType="url"
             mode="outlined"
-            style={styles.serverInput}
+            style={[styles.serverInput, { backgroundColor: colors.surface }]}
             placeholder="http://192.168.1.10:8080"
           />
-          <Text style={styles.serverHint}>{t('backend_url_hint')}</Text>
+          <Text style={[styles.serverHint, { color: colors.textSecondary }]}>{t('backend_url_hint')}</Text>
           <View style={styles.serverActions}>
             <Button mode="outlined" onPress={testServer}>{t('test_connection')}</Button>
             <Button mode="contained" onPress={saveServerUrl}>{t('save')}</Button>
@@ -153,13 +160,13 @@ export default function ProfileScreen() {
       <Button 
         mode="outlined" 
         onPress={signOut} 
-        style={styles.logoutBtn}
-        textColor={THEME.colors.error}
+        style={[styles.logoutBtn, { borderColor: colors.error }]}
+        textColor={colors.error}
       >
         {t('logout')}
       </Button>
       
-      <Text style={styles.version}>PocketLib v1.0.0 (Diploma Edition)</Text>
+      <Text style={[styles.version, { color: colors.textSecondary }]}>PocketLib v1.0.0 (Diploma Edition)</Text>
       <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2600}>
         {message}
       </Snackbar>

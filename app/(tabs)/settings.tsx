@@ -27,10 +27,12 @@ import {
   getLocalizedCourseName,
   getLocalizedDisciplineName,
 } from '../../utils/localizedCatalog';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 export default function SettingsScreen() {
   const { user } = useAuth();
   const { language, t } = useLanguage();
+  const { colors } = useAppTheme();
   const canManageCatalog = user?.role === 'admin' || user?.role === 'teacher';
   const canManageGroups = user?.role === 'admin';
 
@@ -80,7 +82,7 @@ export default function SettingsScreen() {
 
   if (!canManageCatalog) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
         <Text>{t('catalog_access_denied')}</Text>
       </View>
     );
@@ -153,8 +155,8 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.header }]}>
         <Text variant="headlineSmall" style={styles.headerTitle}>{t('settings')}</Text>
         <Text style={styles.headerSub}>{t('catalog_subtitle')}</Text>
       </View>
@@ -304,7 +306,7 @@ export default function SettingsScreen() {
               style={styles.dialogInput}
             />
             <Text style={styles.fieldLabel}>{t('group_course')}</Text>
-            <ScrollView style={styles.coursePicker}>
+            <ScrollView style={[styles.coursePicker, { backgroundColor: colors.surfaceVariant }]}>
               {allCourses.map(course => (
                 <List.Item
                   key={course.id}
@@ -320,7 +322,7 @@ export default function SettingsScreen() {
                 />
               ))}
               {allCourses.length === 0 && (
-                <Text style={styles.emptyText}>{t('create_discipline_course_first')}</Text>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('create_discipline_course_first')}</Text>
               )}
             </ScrollView>
           </Dialog.Content>
@@ -355,6 +357,8 @@ function DisciplineSection({
   onDeleteDiscipline: (id: EntityId) => void;
   onDeleteCourse: (id: EntityId) => void;
 }) {
+  const { colors } = useAppTheme();
+
   return (
     <>
       <Button mode="contained" icon="book-education" onPress={onAddDiscipline} style={styles.addBtn}>
@@ -362,21 +366,21 @@ function DisciplineSection({
       </Button>
       <ScrollView contentContainerStyle={styles.list}>
         {disciplines.length === 0 ? (
-          <Text style={styles.emptyText}>{t('create_first_discipline')}</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('create_first_discipline')}</Text>
         ) : (
           disciplines.map(item => (
-            <Card key={item.disc.id} style={styles.card}>
+            <Card key={item.disc.id} style={[styles.card, { backgroundColor: colors.surface }]}>
               <Card.Content>
                 <View style={styles.cardHeader}>
                   <View style={[styles.colorDot, { backgroundColor: item.disc.color }]} />
-                  <Text variant="titleMedium" style={styles.cardTitle}>{getLocalizedDisciplineName(item.disc, language)}</Text>
-                  <IconButton icon="delete-outline" iconColor={THEME.colors.error} onPress={() => onDeleteDiscipline(item.disc.id)} />
+                  <Text variant="titleMedium" style={[styles.cardTitle, { color: colors.text }]}>{getLocalizedDisciplineName(item.disc, language)}</Text>
+                  <IconButton icon="delete-outline" iconColor={colors.error} onPress={() => onDeleteDiscipline(item.disc.id)} />
                 </View>
 
                 {item.courses.map(course => (
-                  <View key={course.id} style={styles.courseRow}>
-                    <Text style={styles.courseText}>{course.year} {t('course')} · {getLocalizedCourseName(course, language)}</Text>
-                    <IconButton icon="close" size={20} iconColor={THEME.colors.error} onPress={() => onDeleteCourse(course.id)} />
+                  <View key={course.id} style={[styles.courseRow, { borderTopColor: colors.border }]}>
+                    <Text style={[styles.courseText, { color: colors.textSecondary }]}>{course.year} {t('course')} · {getLocalizedCourseName(course, language)}</Text>
+                    <IconButton icon="close" size={20} iconColor={colors.error} onPress={() => onDeleteCourse(course.id)} />
                   </View>
                 ))}
 
@@ -405,6 +409,8 @@ function GroupSection({
   onAddGroup: () => void;
   onDeleteGroup: (id: EntityId) => void;
 }) {
+  const { colors } = useAppTheme();
+
   return (
     <>
       <Button mode="contained" icon="account-group" onPress={onAddGroup} style={styles.addBtn}>
@@ -412,20 +418,20 @@ function GroupSection({
       </Button>
       <ScrollView contentContainerStyle={styles.list}>
         {groups.length === 0 ? (
-          <Text style={styles.emptyText}>{t('groups_empty')}</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('groups_empty')}</Text>
         ) : (
           groups.map(group => (
-            <Card key={group.id} style={styles.card}>
+            <Card key={group.id} style={[styles.card, { backgroundColor: colors.surface }]}>
               <Card.Content>
                 <View style={styles.cardHeader}>
-                  <View style={[styles.colorDot, { backgroundColor: group.discipline_color || THEME.colors.primary }]} />
+                  <View style={[styles.colorDot, { backgroundColor: group.discipline_color || colors.primary }]} />
                   <View style={styles.cardTitleWrap}>
-                    <Text variant="titleMedium" style={styles.cardTitle}>{group.name}</Text>
-                    <Text style={styles.meta}>
+                    <Text variant="titleMedium" style={[styles.cardTitle, { color: colors.text }]}>{group.name}</Text>
+                    <Text style={[styles.meta, { color: colors.textSecondary }]}>
                       {formatStudentGroupDescription(group, language, t)}
                     </Text>
                   </View>
-                  <IconButton icon="delete-outline" iconColor={THEME.colors.error} onPress={() => onDeleteGroup(group.id)} />
+                  <IconButton icon="delete-outline" iconColor={colors.error} onPress={() => onDeleteGroup(group.id)} />
                 </View>
               </Card.Content>
             </Card>

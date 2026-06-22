@@ -6,9 +6,11 @@ import { addBook } from '../../services/bookService';
 import { THEME } from '../../constants/theme';
 import SearchResultCard from '../../components/SearchResultCard';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 export default function GutendexScreen() {
   const { t } = useLanguage();
+  const { colors } = useAppTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -70,8 +72,8 @@ export default function GutendexScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.header }]}>
         <Text variant="headlineSmall" style={styles.headerTitle}>{t('open_literature')}</Text>
         <Text style={styles.headerSubtitle}>{t('gutenberg_search_subtitle')}</Text>
         <View style={styles.searchRow}>
@@ -83,14 +85,15 @@ export default function GutendexScreen() {
             mode="outlined"
             style={styles.input}
             outlineStyle={styles.inputOutline}
-            activeOutlineColor={THEME.colors.primary}
+            activeOutlineColor={colors.primary}
             dense
           />
           <Button
             mode="contained"
             onPress={doSearch}
             style={styles.searchBtn}
-            buttonColor={THEME.colors.accent}
+            buttonColor={colors.accent}
+            textColor={colors.primaryDark}
           >
             {t('search_button')}
           </Button>
@@ -99,17 +102,17 @@ export default function GutendexScreen() {
 
       {loading ? (
         <View style={styles.statusBox}>
-          <ActivityIndicator size="large" color={THEME.colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : !hasSearched && results.length === 0 ? (
         <View style={styles.statusBox}>
-          <Icon source="book-search" size={48} color="#999" />
-          <Text style={styles.statusText}>{t('find_classics_hint')}</Text>
+          <Icon source="book-search" size={48} color={colors.textSecondary} />
+          <Text style={[styles.statusText, { color: colors.textSecondary }]}>{t('find_classics_hint')}</Text>
         </View>
       ) : results.length === 0 ? (
         <View style={styles.statusBox}>
-          <Icon source="flask-empty-outline" size={48} color="#999" />
-          <Text style={styles.statusText}>{t('nothing_found')}</Text>
+          <Icon source="flask-empty-outline" size={48} color={colors.textSecondary} />
+          <Text style={[styles.statusText, { color: colors.textSecondary }]}>{t('nothing_found')}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.resultsLayout}>

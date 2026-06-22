@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { SearchResult } from '../services/api';
 import { THEME } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAppTheme } from '../contexts/ThemeContext';
 
 interface SearchResultCardProps {
   item: SearchResult;
@@ -12,11 +13,12 @@ interface SearchResultCardProps {
 
 export default function SearchResultCard({ item, onAdd }: SearchResultCardProps) {
   const { t } = useLanguage();
+  const { colors } = useAppTheme();
 
   return (
-    <Card style={styles.card}>
+    <Card style={[styles.card, { backgroundColor: colors.surface }]}>
       <View style={styles.row}>
-        <View style={styles.coverWrap}>
+        <View style={[styles.coverWrap, { backgroundColor: colors.surfaceVariant }]}>
           {item.cover_url ? (
             <Image
               source={item.cover_url}
@@ -24,24 +26,24 @@ export default function SearchResultCard({ item, onAdd }: SearchResultCardProps)
               contentFit="cover"
             />
           ) : (
-            <Icon source="book-open-variant" size={40} color="#B3B3BF" />
+            <Icon source="book-open-variant" size={40} color={colors.textSecondary} />
           )}
         </View>
         <View style={styles.info}>
           <Text variant="titleMedium" style={styles.title} numberOfLines={2}>
             {item.title}
           </Text>
-          <Text variant="bodySmall" style={styles.author} numberOfLines={1}>
+          <Text variant="bodySmall" style={[styles.author, { color: colors.textSecondary }]} numberOfLines={1}>
             {item.author}
           </Text>
-          <Text variant="bodySmall" style={styles.meta} numberOfLines={1}>
+          <Text variant="bodySmall" style={[styles.meta, { color: colors.textSecondary }]} numberOfLines={1}>
             {t('year')}: {item.year || '—'}  |  ISBN: {item.isbn || '—'}
           </Text>
 
           {!!item.has_fulltext && (
             <View style={styles.badgeRow}>
-              <Icon source="book-open-page-variant" size={14} color="#1A9E3D" />
-              <Text style={styles.badgeText}>{t('read_online')}</Text>
+              <Icon source="book-open-page-variant" size={14} color={colors.success} />
+              <Text style={[styles.badgeText, { color: colors.success }]}>{t('read_online')}</Text>
             </View>
           )}
         </View>
@@ -49,7 +51,7 @@ export default function SearchResultCard({ item, onAdd }: SearchResultCardProps)
           <IconButton
             icon="plus-circle-outline"
             size={28}
-            iconColor={THEME.colors.primary}
+            iconColor={colors.primary}
             onPress={() => onAdd(item)}
           />
         </View>

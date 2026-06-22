@@ -16,6 +16,7 @@ import { CourseWithDiscipline, Discipline, getAllCoursesWithDisciplines, getAllD
 import { getProgress } from '../../services/readerService';
 import { getLocalizedCourseName, getLocalizedDisciplineName } from '../../utils/localizedCatalog';
 import { isFavoriteBook, rememberRecentBook, toggleFavoriteBook } from '../../services/libraryUxService';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 function getBookKey(book: Book): string {
   return `book:${book.id}`;
@@ -45,6 +46,7 @@ export default function BookDetailScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { language, t } = useLanguage();
+  const { colors } = useAppTheme();
   const [book, setBook] = useState<Book | null>(null);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [courses, setCourses] = useState<CourseWithDiscipline[]>([]);
@@ -238,8 +240,8 @@ export default function BookDetailScreen() {
   const canManageBook = user?.role === 'admin' || user?.role === 'teacher';
 
   return (
-    <View style={styles.container}>
-      <View style={styles.topbar}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.topbar, { backgroundColor: colors.header }]}>
         <IconButton icon="arrow-left" iconColor="#fff" onPress={() => router.back()} />
         <Text variant="titleLarge" style={styles.topbarTitle} numberOfLines={1}>{book.title}</Text>
         <IconButton icon={isFavorite ? 'heart' : 'heart-outline'} iconColor="#fff" onPress={toggleFavorite} />
@@ -249,18 +251,18 @@ export default function BookDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Card style={styles.infoCard}>
+        <Card style={[styles.infoCard, { backgroundColor: colors.surface }]}>
           <View style={styles.row}>
-            <View style={styles.coverWrap}>
+            <View style={[styles.coverWrap, { backgroundColor: colors.surfaceVariant }]}>
               {book.cover_url ? (
                 <Image source={book.cover_url} style={styles.cover} contentFit="cover" />
               ) : (
-                <Icon source="book-education" size={56} color={THEME.colors.primary} />
+                <Icon source="book-education" size={56} color={colors.primary} />
               )}
             </View>
             <View style={styles.mainInfo}>
-              <Text variant="headlineSmall" style={styles.title}>{book.title}</Text>
-              <Text variant="titleMedium" style={styles.author}>{book.author || t('unknown_author')}</Text>
+              <Text variant="headlineSmall" style={[styles.title, { color: colors.text }]}>{book.title}</Text>
+              <Text variant="titleMedium" style={[styles.author, { color: colors.textSecondary }]}>{book.author || t('unknown_author')}</Text>
               <View style={styles.badgeRow}>
                 {book.material_type ? <Badge label={typeLabels[book.material_type] || book.material_type} type="type" /> : null}
                 {book.language ? <Badge label={book.language.toUpperCase()} type="lang" /> : null}
@@ -270,22 +272,22 @@ export default function BookDetailScreen() {
           </View>
         </Card>
 
-        <View style={styles.detailsBox}>
+        <View style={[styles.detailsBox, { backgroundColor: colors.surface }]}>
           <View style={styles.detailItem}>
-            <Icon source="book-open-outline" size={20} color={THEME.colors.textSecondary} />
-            <Text style={styles.detailText}>{`${t('discipline')}: ${currentDiscipline ? getLocalizedDisciplineName(currentDiscipline, language) : t('not_specified')}`}</Text>
+            <Icon source="book-open-outline" size={20} color={colors.textSecondary} />
+            <Text style={[styles.detailText, { color: colors.text }]}>{`${t('discipline')}: ${currentDiscipline ? getLocalizedDisciplineName(currentDiscipline, language) : t('not_specified')}`}</Text>
           </View>
           <View style={styles.detailItem}>
-            <Icon source="school-outline" size={20} color={THEME.colors.textSecondary} />
-            <Text style={styles.detailText}>{`${t('course')}: ${currentCourse ? `${currentCourse.year} ${t('course')} · ${getLocalizedCourseName(currentCourse, language)}` : t('not_specified')}`}</Text>
+            <Icon source="school-outline" size={20} color={colors.textSecondary} />
+            <Text style={[styles.detailText, { color: colors.text }]}>{`${t('course')}: ${currentCourse ? `${currentCourse.year} ${t('course')} · ${getLocalizedCourseName(currentCourse, language)}` : t('not_specified')}`}</Text>
           </View>
           <View style={styles.detailItem}>
-            <Icon source="database-outline" size={20} color={THEME.colors.textSecondary} />
-            <Text style={styles.detailText}>{`${t('source')}: ${book.source === 'gutenberg' ? 'Project Gutenberg' : book.source || t('not_specified')}`}</Text>
+            <Icon source="database-outline" size={20} color={colors.textSecondary} />
+            <Text style={[styles.detailText, { color: colors.text }]}>{`${t('source')}: ${book.source === 'gutenberg' ? 'Project Gutenberg' : book.source || t('not_specified')}`}</Text>
           </View>
           <View style={styles.detailItem}>
-            <Icon source={internalReaderAvailable ? 'book-check-outline' : isMediaDocument ? 'file-document-outline' : 'open-in-new'} size={20} color={THEME.colors.textSecondary} />
-            <Text style={styles.detailText}>
+            <Icon source={internalReaderAvailable ? 'book-check-outline' : isMediaDocument ? 'file-document-outline' : 'open-in-new'} size={20} color={colors.textSecondary} />
+            <Text style={[styles.detailText, { color: colors.text }]}>
               {book.is_downloaded
                 ? (internalReaderAvailable ? t('available_in_app') : t('downloaded_document'))
                 : book.has_file ? t('server_file_hint') : t('external_link_available')}
@@ -295,16 +297,16 @@ export default function BookDetailScreen() {
 
         <Divider style={styles.divider} />
         <Text variant="titleMedium" style={styles.descriptionTitle}>{t('description')}</Text>
-        <Text style={styles.description}>{book.description || t('description_missing')}</Text>
+        <Text style={[styles.description, { color: colors.textSecondary }]}>{book.description || t('description_missing')}</Text>
 
         {progressInfo ? (
           <View style={styles.progressContainer}>
             <View style={styles.progressHeader}>
-              <Text style={styles.progressText}>{progressInfo.text}</Text>
-              <Text style={styles.progressPercent}>{progressInfo.percent}%</Text>
+              <Text style={[styles.progressText, { color: colors.textSecondary }]}>{progressInfo.text}</Text>
+              <Text style={[styles.progressPercent, { color: colors.primary }]}>{progressInfo.percent}%</Text>
             </View>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${progressInfo.percent}%` }]} />
+            <View style={[styles.progressBar, { backgroundColor: colors.surfaceVariant }]}>
+              <View style={[styles.progressFill, { width: `${progressInfo.percent}%`, backgroundColor: colors.primary }]} />
             </View>
           </View>
         ) : null}
@@ -316,7 +318,7 @@ export default function BookDetailScreen() {
               icon="download"
               disabled={!canRead || downloading}
               loading={downloading}
-              buttonColor={THEME.colors.primary}
+              buttonColor={colors.primary}
               onPress={downloadBook}
             >
               {canRead ? t('download_book') : t('access_restricted')}
@@ -326,7 +328,7 @@ export default function BookDetailScreen() {
               mode="contained"
               icon={internalReaderAvailable ? 'book-open-page-variant' : isMediaDocument ? 'file-document-outline' : 'open-in-new'}
               disabled={!canRead || !documentAvailable}
-              buttonColor={THEME.colors.primary}
+              buttonColor={colors.primary}
               onPress={openBook}
             >
               {canRead ? (internalReaderAvailable ? t('read') : documentAvailable ? t('open_document') : t('no_file')) : t('access_restricted')}
@@ -379,7 +381,7 @@ export default function BookDetailScreen() {
             <Button
               mode="outlined"
               icon="delete-outline"
-              textColor={THEME.colors.error}
+              textColor={colors.error}
               disabled={deleting}
               loading={deleting}
               onPress={requestDelete}
@@ -399,7 +401,7 @@ export default function BookDetailScreen() {
           </Dialog.Content>
           <Dialog.Actions>
             <Button disabled={deleting} onPress={() => setDeleteDialogVisible(false)}>{t('cancel')}</Button>
-            <Button loading={deleting} disabled={deleting} textColor={THEME.colors.error} onPress={confirmDelete}>
+            <Button loading={deleting} disabled={deleting} textColor={colors.error} onPress={confirmDelete}>
               {t('delete')}
             </Button>
           </Dialog.Actions>

@@ -6,11 +6,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { deleteUser, getAllUsers, updateUserRole, User } from '../../services/userService';
 import { THEME } from '../../constants/theme';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 export default function AdminScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { colors } = useAppTheme();
   const [users, setUsers] = useState<User[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState('');
@@ -29,7 +31,7 @@ export default function AdminScreen() {
 
   if (user?.role !== 'admin') {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
         <Text>{t('admin_access_denied')}</Text>
       </View>
     );
@@ -56,8 +58,8 @@ export default function AdminScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.header }]}>
         <Text variant="headlineSmall" style={styles.headerTitle}>{t('admin_panel')}</Text>
         <Text style={styles.headerSub}>{t('admin_subtitle')}</Text>
       </View>
@@ -66,7 +68,7 @@ export default function AdminScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Card style={styles.actionsCard}>
+        <Card style={[styles.actionsCard, { backgroundColor: colors.surface }]}>
           <Card.Content>
             <Text variant="titleMedium">{t('books')}</Text>
             <View style={styles.actionRow}>
@@ -77,17 +79,17 @@ export default function AdminScreen() {
 
         <Text variant="titleLarge" style={styles.sectionTitle}>{t('users')}: {users.length}</Text>
         {users.map((item) => (
-          <Card key={item.id} style={styles.userCard}>
+          <Card key={item.id} style={[styles.userCard, { backgroundColor: colors.surface }]}>
             <Card.Content>
               <View style={styles.userHeader}>
                 <View style={styles.userInfo}>
                   <Text variant="titleMedium">{item.full_name}</Text>
-                  <Text style={styles.meta}>{item.email}</Text>
-                  {!!item.group_name && <Text style={styles.meta}>{t('group_label')}: {item.group_name}</Text>}
+                  <Text style={[styles.meta, { color: colors.textSecondary }]}>{item.email}</Text>
+                  {!!item.group_name && <Text style={[styles.meta, { color: colors.textSecondary }]}>{t('group_label')}: {item.group_name}</Text>}
                 </View>
                 {item.email === 'admin@university.edu'
                   ? <Chip compact>{t('primary_admin')}</Chip>
-                  : <IconButton icon="delete-outline" iconColor={THEME.colors.error} onPress={() => confirmDelete(item)} />}
+                  : <IconButton icon="delete-outline" iconColor={colors.error} onPress={() => confirmDelete(item)} />}
               </View>
               <SegmentedButtons
                 value={item.role}

@@ -12,12 +12,14 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { getFavoriteBookIds, getRecentBookIds } from '../../services/libraryUxService';
 import { getProgress } from '../../services/readerService';
 import PwaInstallButton from '../../components/PwaInstallButton';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 const COLLEGE_LOGO = require('../../assets/polytech-logo.png');
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { colors } = useAppTheme();
   const router = useRouter();
   const [recentBooks, setRecentBooks] = useState<Book[]>([]);
   const [offlineBooks, setOfflineBooks] = useState<Book[]>([]);
@@ -93,12 +95,12 @@ export default function Dashboard() {
   if (!user) return null;
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.background }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-      <View style={styles.welcomeSection}>
+      <View style={[styles.welcomeSection, { backgroundColor: colors.header }]}>
         <View style={styles.brandRow}>
           <View style={styles.brandLogoBox}>
             <Image source={COLLEGE_LOGO} style={styles.brandLogo} contentFit="contain" />
@@ -121,8 +123,8 @@ export default function Dashboard() {
             <Avatar.Text 
               size={50} 
               label={user.full_name[0].toUpperCase()} 
-              style={{ backgroundColor: THEME.colors.accent }}
-              labelStyle={{ color: THEME.colors.primary }}
+              style={{ backgroundColor: colors.accent }}
+              labelStyle={{ color: colors.primaryDark }}
             />
           </TouchableOpacity>
         </View>
@@ -146,48 +148,48 @@ export default function Dashboard() {
 
       <View style={styles.content}>
         <View style={styles.actionGrid}>
-          <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/library')}>
-            <View style={[styles.iconCircle, { backgroundColor: '#E8EAF6' }]}>
-              <Icon source="bookshelf" size={24} color={THEME.colors.primary} />
+          <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.surface }]} onPress={() => router.push('/library')}>
+            <View style={[styles.iconCircle, { backgroundColor: colors.badgeBg }]}>
+              <Icon source="bookshelf" size={24} color={colors.primary} />
             </View>
-            <Text style={styles.actionText}>{t('library')}</Text>
+            <Text style={[styles.actionText, { color: colors.text }]}>{t('library')}</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/library?offline=true')}>
-            <View style={[styles.iconCircle, { backgroundColor: '#E8F5E9' }]}>
-              <Icon source="download-circle" size={24} color={THEME.colors.success} />
+          <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.surface }]} onPress={() => router.push('/library?offline=true')}>
+            <View style={[styles.iconCircle, { backgroundColor: colors.badgeOfflineBg }]}>
+              <Icon source="download-circle" size={24} color={colors.success} />
             </View>
-            <Text style={styles.actionText}>{t('offline')}</Text>
+            <Text style={[styles.actionText, { color: colors.text }]}>{t('offline')}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/library?available=true')}>
-            <View style={[styles.iconCircle, { backgroundColor: '#E3F2FD' }]}>
-              <Icon source="web" size={24} color={THEME.colors.info} />
+          <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.surface }]} onPress={() => router.push('/library?available=true')}>
+            <View style={[styles.iconCircle, { backgroundColor: colors.surfaceVariant }]}>
+              <Icon source="web" size={24} color={colors.info} />
             </View>
-            <Text style={styles.actionText}>{t('available_online')}</Text>
+            <Text style={[styles.actionText, { color: colors.text }]}>{t('available_online')}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/library?favorites=true')}>
-            <View style={[styles.iconCircle, { backgroundColor: '#FFF3E0' }]}>
-              <Icon source="heart" size={24} color={THEME.colors.warning} />
+          <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.surface }]} onPress={() => router.push('/library?favorites=true')}>
+            <View style={[styles.iconCircle, { backgroundColor: colors.badgeLangBg }]}>
+              <Icon source="heart" size={24} color={colors.warning} />
             </View>
-            <Text style={styles.actionText}>{t('favorite_books')}</Text>
+            <Text style={[styles.actionText, { color: colors.text }]}>{t('favorite_books')}</Text>
           </TouchableOpacity>
 
           {(user.role === 'admin' || user.role === 'teacher') && (
             <>
-              <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/add')}>
-                <View style={[styles.iconCircle, { backgroundColor: '#FCE4EC' }]}>
+              <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.surface }]} onPress={() => router.push('/add')}>
+                <View style={[styles.iconCircle, { backgroundColor: colors.surfaceVariant }]}>
                   <Icon source="plus-box" size={24} color="#C2185B" />
                 </View>
-                <Text style={styles.actionText}>{t('add')}</Text>
+                <Text style={[styles.actionText, { color: colors.text }]}>{t('add')}</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/gutendex')}>
-                <View style={[styles.iconCircle, { backgroundColor: '#F3E5F5' }]}>
+              <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.surface }]} onPress={() => router.push('/gutendex')}>
+                <View style={[styles.iconCircle, { backgroundColor: colors.surfaceVariant }]}>
                   <Icon source="book-search" size={24} color="#7B1FA2" />
                 </View>
-                <Text style={styles.actionText}>{t('gutendex')}</Text>
+                <Text style={[styles.actionText, { color: colors.text }]}>{t('gutendex')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -196,9 +198,9 @@ export default function Dashboard() {
         {continueBooks.length > 0 ? (
           <>
             <View style={styles.sectionHeader}>
-              <Text variant="titleLarge" style={styles.sectionTitle}>{t('continue_reading')}</Text>
+              <Text variant="titleLarge" style={[styles.sectionTitle, { color: colors.text }]}>{t('continue_reading')}</Text>
               <TouchableOpacity onPress={() => router.push('/library?available=true')}>
-                <Text style={styles.seeAll}>{t('all')}</Text>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>{t('all')}</Text>
               </TouchableOpacity>
             </View>
             {continueBooks.map(book => (
@@ -214,9 +216,9 @@ export default function Dashboard() {
         {favoriteBooks.length > 0 ? (
           <>
             <View style={[styles.sectionHeader, { marginTop: 20 }]}>
-              <Text variant="titleLarge" style={styles.sectionTitle}>{t('favorite_books')}</Text>
+              <Text variant="titleLarge" style={[styles.sectionTitle, { color: colors.text }]}>{t('favorite_books')}</Text>
               <TouchableOpacity onPress={() => router.push('/library?favorites=true')}>
-                <Text style={styles.seeAll}>{t('all')}</Text>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>{t('all')}</Text>
               </TouchableOpacity>
             </View>
             {favoriteBooks.map(book => (
@@ -230,9 +232,9 @@ export default function Dashboard() {
         ) : null}
 
         <View style={styles.sectionHeader}>
-          <Text variant="titleLarge" style={styles.sectionTitle}>{t('latest_added')}</Text>
+          <Text variant="titleLarge" style={[styles.sectionTitle, { color: colors.text }]}>{t('latest_added')}</Text>
           <TouchableOpacity onPress={() => router.push('/library')}>
-            <Text style={styles.seeAll}>{t('all')}</Text>
+            <Text style={[styles.seeAll, { color: colors.primary }]}>{t('all')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -245,13 +247,13 @@ export default function Dashboard() {
             />
           ))
         ) : (
-          <Card style={styles.emptyCard}>
-            <Text style={styles.emptyText}>{t('no_materials')}</Text>
+          <Card style={[styles.emptyCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('no_materials')}</Text>
           </Card>
         )}
 
         <View style={[styles.sectionHeader, { marginTop: 20 }]}>
-          <Text variant="titleLarge" style={styles.sectionTitle}>{t('for_your_group')}</Text>
+          <Text variant="titleLarge" style={[styles.sectionTitle, { color: colors.text }]}>{t('for_your_group')}</Text>
         </View>
         {recommendedBooks.length > 0 ? (
           recommendedBooks.map(book => (
@@ -262,8 +264,8 @@ export default function Dashboard() {
             />
           ))
         ) : (
-          <Card style={styles.emptyCard}>
-            <Text style={styles.emptyText}>
+          <Card style={[styles.emptyCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
               {user.group_name ? t('no_group_materials') : t('choose_group_hint')}
             </Text>
           </Card>

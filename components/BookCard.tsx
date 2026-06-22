@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { Book } from '../services/bookService';
 import { THEME } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAppTheme } from '../contexts/ThemeContext';
 
 interface BookCardProps {
   book: Book;
@@ -12,12 +13,13 @@ interface BookCardProps {
 
 export default function BookCard({ book, onPress }: BookCardProps) {
   const { t } = useLanguage();
+  const { colors } = useAppTheme();
   const hasText = !!(book.has_fulltext || book.ol_key);
 
   return (
-    <Card style={styles.card} onPress={() => onPress?.(book)}>
+    <Card style={[styles.card, { backgroundColor: colors.surface }]} onPress={() => onPress?.(book)}>
       <View style={styles.row}>
-        <View style={styles.coverWrap}>
+        <View style={[styles.coverWrap, { backgroundColor: colors.surfaceVariant }]}>
           {book.cover_url ? (
             <Image
               source={book.cover_url}
@@ -25,28 +27,28 @@ export default function BookCard({ book, onPress }: BookCardProps) {
               contentFit="cover"
             />
           ) : (
-            <Icon source="book-open-variant" size={36} color="#999" />
+            <Icon source="book-open-variant" size={36} color={colors.textSecondary} />
           )}
         </View>
         <View style={styles.info}>
           <Text variant="titleMedium" style={styles.title} numberOfLines={2}>
             {book.title}
           </Text>
-          <Text variant="bodySmall" style={styles.author} numberOfLines={1}>
+          <Text variant="bodySmall" style={[styles.author, { color: colors.textSecondary }]} numberOfLines={1}>
             {book.author || t('unknown_author')}
           </Text>
           
           <View style={styles.statusRow}>
             {hasText && (
               <View style={styles.statusBadge}>
-                <Icon source="book-open-page-variant" size={14} color="#1A9E3D" />
-                <Text style={[styles.statusText, { color: '#1A9E3D' }]}>{t('online')}</Text>
+                <Icon source="book-open-page-variant" size={14} color={colors.success} />
+                <Text style={[styles.statusText, { color: colors.success }]}>{t('online')}</Text>
               </View>
             )}
             {!!book.is_downloaded && (
               <View style={styles.statusBadge}>
-                <Icon source="download-circle" size={14} color="#3442A4" />
-                <Text style={[styles.statusText, { color: '#3442A4' }]}>{t('offline')}</Text>
+                <Icon source="download-circle" size={14} color={colors.primary} />
+                <Text style={[styles.statusText, { color: colors.primary }]}>{t('offline')}</Text>
               </View>
             )}
           </View>

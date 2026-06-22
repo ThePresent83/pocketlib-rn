@@ -9,6 +9,7 @@ import { getAllDisciplines, Discipline, getAllCategories, Category, Course, getC
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getLocalizedCourseName, getLocalizedDisciplineName } from '../../utils/localizedCatalog';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 function getFileExtension(fileName: string): string {
   return fileName.split('?')[0].split('.').pop()?.toLowerCase() || '';
@@ -26,6 +27,7 @@ export default function AddMaterialScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { language: appLanguage, t } = useLanguage();
+  const { colors } = useAppTheme();
   
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
@@ -154,22 +156,22 @@ export default function AddMaterialScreen() {
 
   if (user?.role === 'student') {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
         <Text>{t('no_add_rights')}</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text variant="headlineSmall" style={styles.header}>{t('add_material')}</Text>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
+      <Text variant="headlineSmall" style={[styles.header, { color: colors.primary }]}>{t('add_material')}</Text>
       
       <TextInput
         label={t('title_required')}
         value={title}
         onChangeText={setTitle}
         mode="outlined"
-        style={styles.input}
+        style={[styles.input, { backgroundColor: colors.surface }]}
       />
       
       <TextInput
@@ -177,7 +179,7 @@ export default function AddMaterialScreen() {
         value={author}
         onChangeText={setAuthor}
         mode="outlined"
-        style={styles.input}
+        style={[styles.input, { backgroundColor: colors.surface }]}
         placeholder={user?.full_name}
       />
 
@@ -188,10 +190,10 @@ export default function AddMaterialScreen() {
         mode="outlined"
         multiline
         numberOfLines={3}
-        style={styles.input}
+        style={[styles.input, { backgroundColor: colors.surface }]}
       />
 
-      <Text style={styles.label}>{t('material_type')}</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{t('material_type')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.segmentScroll}>
         <SegmentedButtons
           value={materialType}
@@ -207,7 +209,7 @@ export default function AddMaterialScreen() {
 
       <View style={styles.row}>
         <View style={{ flex: 1, marginRight: 8 }}>
-          <Text style={styles.label}>{t('language_short')}</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>{t('language_short')}</Text>
           <SegmentedButtons
             value={materialLanguage}
             onValueChange={setMaterialLanguage}
@@ -219,7 +221,7 @@ export default function AddMaterialScreen() {
           />
         </View>
         <View style={{ width: 100 }}>
-          <Text style={styles.label}>{t('semester')}</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>{t('semester')}</Text>
           <TextInput
             value={semester}
             onChangeText={setSemester}
@@ -235,7 +237,7 @@ export default function AddMaterialScreen() {
         description={selectedDiscipline ? getLocalizedDisciplineName(selectedDiscipline, appLanguage) : t('choose_discipline')}
         left={props => <List.Icon {...props} icon="book-education" />}
         onPress={() => setDiscDialogVisible(true)}
-        style={styles.selector}
+        style={[styles.selector, { backgroundColor: colors.surface }]}
       />
 
       <List.Item
@@ -245,7 +247,7 @@ export default function AddMaterialScreen() {
           : selectedDiscipline ? t('choose_course') : t('choose_discipline_first')}
         left={props => <List.Icon {...props} icon="school-outline" />}
         onPress={() => selectedDiscipline && setCourseDialogVisible(true)}
-        style={styles.selector}
+        style={[styles.selector, { backgroundColor: colors.surface }]}
       />
 
       <List.Item
@@ -253,13 +255,13 @@ export default function AddMaterialScreen() {
         description={selectedCategory ? selectedCategory.name : t('choose_category')}
         left={props => <List.Icon {...props} icon="tag-outline" />}
         onPress={() => setCatDialogVisible(true)}
-        style={styles.selector}
+        style={[styles.selector, { backgroundColor: colors.surface }]}
       />
 
-      <View style={styles.fileBox}>
+      <View style={[styles.fileBox, { borderColor: colors.border, backgroundColor: colors.surface }]}>
         {selectedFile ? (
           <View style={styles.fileInfo}>
-            <Icon source="file-check" size={24} color={THEME.colors.success} />
+            <Icon source="file-check" size={24} color={colors.success} />
             <Text style={styles.fileName} numberOfLines={1}>{selectedFile.name}</Text>
             <IconButton icon="close" size={20} onPress={() => setSelectedFile(null)} />
           </View>

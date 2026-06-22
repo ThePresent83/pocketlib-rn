@@ -1,28 +1,31 @@
 import { Tabs } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { THEME } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 export default function TabLayout() {
   const { user } = useAuth();
   const isAdminOrTeacher = user?.role === 'admin' || user?.role === 'teacher';
   const { t } = useLanguage();
+  const { colors } = useAppTheme();
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: THEME.colors.primary,
-        tabBarInactiveTintColor: '#9e9e9e',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textSecondary,
         headerStyle: {
-          backgroundColor: THEME.colors.primary,
+          backgroundColor: colors.header,
         },
-        headerTintColor: '#fff',
+        headerTintColor: colors.onPrimary,
         headerShown: true,
         tabBarStyle: {
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
         }
       }}>
       <Tabs.Screen

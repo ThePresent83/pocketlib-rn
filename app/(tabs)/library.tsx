@@ -10,6 +10,7 @@ import MaterialCard from '../../components/MaterialCard';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getLocalizedDisciplineName } from '../../utils/localizedCatalog';
 import { getFavoriteBookIds, toggleFavoriteBook } from '../../services/libraryUxService';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 type SortMode = 'newest' | 'title' | 'author' | 'offline';
 
@@ -35,6 +36,7 @@ export default function LibraryScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { language, t } = useLanguage();
+  const { colors } = useAppTheme();
   
   const [query, setQuery] = useState('');
   const [books, setBooks] = useState<Book[]>([]);
@@ -142,8 +144,8 @@ export default function LibraryScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.header }]}>
         <View style={styles.searchRow}>
           <Searchbar
             placeholder={t('search_materials')}
@@ -181,9 +183,9 @@ export default function LibraryScreen() {
               icon="filter-variant" 
               iconColor="#fff" 
               onPress={() => setFilterVisible(true)} 
-              containerColor={THEME.colors.accent}
+              containerColor={colors.accent}
             />
-            {activeFilterCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{activeFilterCount}</Text></View>}
+            {activeFilterCount > 0 && <View style={[styles.badge, { backgroundColor: colors.surface }]}><Text style={[styles.badgeText, { color: colors.primary }]}>{activeFilterCount}</Text></View>}
           </View>
         </View>
         
@@ -202,7 +204,7 @@ export default function LibraryScreen() {
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Text style={styles.resultCount}>{books.length} {t('materials').toLowerCase()}</Text>
+        <Text style={[styles.resultCount, { color: colors.textSecondary }]}>{books.length} {t('materials').toLowerCase()}</Text>
         {books.length > 0 ? (
           books.map(book => (
             <MaterialCard 
@@ -215,8 +217,8 @@ export default function LibraryScreen() {
           ))
         ) : (
           <View style={styles.empty}>
-            <IconButton icon="book-off-outline" size={64} iconColor="#ccc" />
-            <Text variant="titleMedium" style={{ color: '#999' }}>{t('materials_not_found')}</Text>
+            <IconButton icon="book-off-outline" size={64} iconColor={colors.textSecondary} />
+            <Text variant="titleMedium" style={{ color: colors.textSecondary }}>{t('materials_not_found')}</Text>
             {activeFilterCount > 0 && (
               <Button mode="text" onPress={resetFilters}>{t('reset_filters')}</Button>
             )}
@@ -228,7 +230,7 @@ export default function LibraryScreen() {
         <Modal 
           visible={filterVisible} 
           onDismiss={() => setFilterVisible(false)} 
-          contentContainerStyle={styles.modal}
+          contentContainerStyle={[styles.modal, { backgroundColor: colors.surface }]}
         >
           <Text variant="titleLarge" style={styles.modalTitle}>{t('filters')}</Text>
           <Divider style={{ marginBottom: 16 }} />
@@ -256,7 +258,7 @@ export default function LibraryScreen() {
                   key={d.id} 
                   title={getLocalizedDisciplineName(d, language)} 
                   onPress={() => setSelectedDiscipline(d.id)}
-                  style={selectedDiscipline === d.id ? styles.selected : null}
+                  style={selectedDiscipline === d.id ? [styles.selected, { backgroundColor: colors.surfaceVariant }] : null}
                 />
               ))}
             </List.Accordion>
@@ -268,7 +270,7 @@ export default function LibraryScreen() {
                   key={c.id} 
                   title={c.name} 
                   onPress={() => setSelectedCategory(c.id)}
-                  style={selectedCategory === c.id ? styles.selected : null}
+                  style={selectedCategory === c.id ? [styles.selected, { backgroundColor: colors.surfaceVariant }] : null}
                 />
               ))}
             </List.Accordion>
@@ -276,7 +278,7 @@ export default function LibraryScreen() {
             <List.Accordion title={t('material_types')} left={props => <List.Icon {...props} icon="file-document-outline" />}>
               <List.Item title={t('all_types')} onPress={() => setMaterialType(null)} />
               {['textbook', 'lecture', 'manual', 'practice'].map(type => (
-                <List.Item key={type} title={typeLabels[type] || type} onPress={() => setMaterialType(type)} style={materialType === type ? styles.selected : null} />
+                <List.Item key={type} title={typeLabels[type] || type} onPress={() => setMaterialType(type)} style={materialType === type ? [styles.selected, { backgroundColor: colors.surfaceVariant }] : null} />
               ))}
             </List.Accordion>
 
@@ -286,7 +288,7 @@ export default function LibraryScreen() {
                   key={mode}
                   title={sortLabels[mode]}
                   onPress={() => setSortMode(mode)}
-                  style={sortMode === mode ? styles.selected : null}
+                  style={sortMode === mode ? [styles.selected, { backgroundColor: colors.surfaceVariant }] : null}
                 />
               ))}
             </List.Accordion>

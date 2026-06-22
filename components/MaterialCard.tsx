@@ -6,6 +6,7 @@ import { Book } from '../services/bookService';
 import { THEME } from '../constants/theme';
 import Badge from './Badge';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAppTheme } from '../contexts/ThemeContext';
 
 interface MaterialCardProps {
   item: Book;
@@ -20,6 +21,7 @@ function getFileExtension(path?: string): string {
 
 export default function MaterialCard({ item, onPress, isFavorite, onToggleFavorite }: MaterialCardProps) {
   const { t } = useLanguage();
+  const { colors } = useAppTheme();
   const typeLabels: Record<string, string> = {
     textbook: t('textbook'),
     lecture: t('lecture'),
@@ -37,9 +39,9 @@ export default function MaterialCard({ item, onPress, isFavorite, onToggleFavori
 
   return (
     <TouchableOpacity onPress={() => onPress(item)} activeOpacity={0.8}>
-      <Card style={styles.card}>
+      <Card style={[styles.card, { backgroundColor: colors.surface }]}>
         <View style={styles.row}>
-          <View style={styles.coverWrap}>
+          <View style={[styles.coverWrap, { backgroundColor: colors.surfaceVariant }]}>
             {item.cover_url ? (
               <Image
                 source={item.cover_url}
@@ -47,16 +49,16 @@ export default function MaterialCard({ item, onPress, isFavorite, onToggleFavori
                 contentFit="cover"
               />
             ) : (
-              <Icon source="book-open-variant" size={40} color="#B3B3BF" />
+              <Icon source="book-open-variant" size={40} color={colors.textSecondary} />
             )}
           </View>
           <View style={styles.info}>
             <View style={styles.titleRow}>
               <View style={styles.titleTextBlock}>
-            <Text variant="titleMedium" style={styles.title} numberOfLines={2}>
+            <Text variant="titleMedium" style={[styles.title, { color: colors.text }]} numberOfLines={2}>
               {item.title}
             </Text>
-            <Text variant="bodySmall" style={styles.author} numberOfLines={1}>
+            <Text variant="bodySmall" style={[styles.author, { color: colors.textSecondary }]} numberOfLines={1}>
               {item.author || t('unknown_author')}
             </Text>
               </View>
@@ -64,7 +66,7 @@ export default function MaterialCard({ item, onPress, isFavorite, onToggleFavori
                 <IconButton
                   icon={isFavorite ? 'heart' : 'heart-outline'}
                   size={20}
-                  iconColor={isFavorite ? THEME.colors.warning : THEME.colors.textSecondary}
+                  iconColor={isFavorite ? colors.warning : colors.textSecondary}
                   style={styles.favoriteButton}
                   onPress={() => onToggleFavorite(item)}
                 />
@@ -79,7 +81,7 @@ export default function MaterialCard({ item, onPress, isFavorite, onToggleFavori
                 <Badge label={item.language.toUpperCase()} type="lang" />
               )}
               {item.is_downloaded ? (
-                <Badge label={t('offline')} type="offline" icon={<Icon source="check-circle" size={12} color={THEME.colors.badgeOfflineText} />} />
+                <Badge label={t('offline')} type="offline" icon={<Icon source="check-circle" size={12} color={colors.badgeOfflineText} />} />
               ) : item.has_file ? (
                 <Badge label={t('on_server')} />
               ) : (
@@ -90,9 +92,9 @@ export default function MaterialCard({ item, onPress, isFavorite, onToggleFavori
               <Icon
                 source={canReadInside ? 'book-open-page-variant' : item.has_file && !item.is_downloaded ? 'download' : isMediaDocument ? 'file-document-outline' : 'open-in-new'}
                 size={15}
-                color={canReadInside ? THEME.colors.success : isMediaDocument ? THEME.colors.warning : THEME.colors.info}
+                color={canReadInside ? colors.success : isMediaDocument ? colors.warning : colors.info}
               />
-              <Text style={[styles.readHintText, { color: canReadInside ? THEME.colors.success : isMediaDocument ? THEME.colors.warning : THEME.colors.info }]}>
+              <Text style={[styles.readHintText, { color: canReadInside ? colors.success : isMediaDocument ? colors.warning : colors.info }]}>
                 {readHint}
               </Text>
             </View>
