@@ -7,6 +7,8 @@ declare const process: { env?: { EXPO_PUBLIC_API_URL?: string } } | undefined;
 const ACCESS_TOKEN_KEY = 'pocketlib_access_token';
 const REFRESH_TOKEN_KEY = 'pocketlib_refresh_token';
 const API_URL_OVERRIDE_KEY = 'pocketlib_api_url_override';
+const HOSTED_API_PATH = '/api';
+const HOSTED_DOMAINS = new Set(['poketlib.aspc.kz', 'pocketlib.aspc.kz']);
 
 export interface AuthTokens {
   access_token: string;
@@ -15,8 +17,33 @@ export interface AuthTokens {
   expires_in?: number;
 }
 
+function getWebOrigin(): string {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return '';
+  return window.location?.origin || '';
+}
+
+function shouldUseHostedApiPath(url: URL) {
+  const path = url.pathname.replace(/\/+$/, '');
+  if (path && path !== '/') return false;
+  if (Platform.OS === 'web' && url.origin === getWebOrigin()) return true;
+  return HOSTED_DOMAINS.has(url.hostname.toLowerCase()) && !url.port;
+}
+
 function normalizeApiUrl(value: string) {
-  return value.trim().replace(/\/$/, '');
+  const raw = value.trim().replace(/\/+$/, '');
+  try {
+    const url = new URL(raw);
+    url.hash = '';
+    url.search = '';
+    if (shouldUseHostedApiPath(url)) {
+      url.pathname = HOSTED_API_PATH;
+    } else {
+      url.pathname = url.pathname.replace(/\/+$/, '');
+    }
+    return url.toString().replace(/\/+$/, '');
+  } catch {
+    return raw;
+  }
 }
 
 function inferApiUrl() {
