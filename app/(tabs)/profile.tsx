@@ -123,11 +123,9 @@ export default function ProfileScreen() {
             value={language}
             onValueChange={(value) => setLanguage(value as AppLanguage)}
             buttons={[
-            
               { value: 'kk', label: 'KZ' },
-              { value: 'kk', label: 'KZ' },
-              { value: 'kk', label: 'KZ' },
-              
+              { value: 'ru', label: 'RU' },
+              { value: 'en', label: 'EN' },
             ]}
           />
         </View>
