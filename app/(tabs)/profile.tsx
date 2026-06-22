@@ -125,8 +125,9 @@ export default function ProfileScreen() {
             buttons={[
             
               { value: 'kk', label: 'KZ' },
-              { value: 'ru', label: 'RU' },
-              { value: 'en', label: 'EN' },
+              { value: 'kk', label: 'KZ' },
+              { value: 'kk', label: 'KZ' },
+              
             ]}
           />
         </View>
